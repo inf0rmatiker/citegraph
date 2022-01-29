@@ -1,5 +1,0 @@
-object Application {
-
-
-
-}
