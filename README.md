@@ -16,3 +16,7 @@ This project is intended to be submitted to a Spark Master via `spark-submit` as
   - `./submit.sh <hdfs_input_dir> <hdfs_output_dir>`
 - To ingest the raw data into HDFS, use 
   - `./ingest.sh <input_data_directory> <hdfs_data_directory>`
+
+## Docs
+
+View the project assignment description under the [docs/](docs) directory
