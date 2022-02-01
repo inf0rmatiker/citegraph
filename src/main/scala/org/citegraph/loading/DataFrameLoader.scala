@@ -21,7 +21,7 @@ class DataFrameLoader(val dataDirectory: String, val sparkSession: SparkSession)
       .map(line => {
         val lineParts: Array[String] = line.split("\\s+") // Split on whitespace
         Row(lineParts(0).trim(), lineParts(1).trim())
-      }) [RDD[Row]]
+      })
 
     sparkSession.createDataFrame(citationsRDD, schemas.citationsSchema)
   }
