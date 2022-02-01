@@ -1,6 +1,6 @@
 package org.citegraph
 
-import org.apache.spark.sql.types.{DoubleType, IntegerType, LongType, StringType, StructType}
+import org.apache.spark.sql.types.{IntegerType, StructType}
 
 package object schemas {
 

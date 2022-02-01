@@ -1,7 +1,9 @@
 package org.citegraph.loading
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.citegraph.schemas
 
 class DataFrameLoader(val dataDirectory: String, val sparkSession: SparkSession) {
 
@@ -14,14 +16,14 @@ class DataFrameLoader(val dataDirectory: String, val sparkSession: SparkSession)
    */
   def loadCitations(): DataFrame = {
     val sparkContext: SparkContext = sparkSession.sparkContext
-    val citationsRDD = sparkContext.textFile(s"$dataDirectory/$CITATIONS_TXT_STR")
+    val citationsRDD: RDD[Row] = sparkContext.textFile(s"$dataDirectory/$CITATIONS_TXT_STR")
       .filter(line => !line.contains("#") && line.trim().nonEmpty) // Remove lines that contain '#' and empty lines
       .map(line => {
         val lineParts: Array[String] = line.split("\\s+") // Split on whitespace
-        (lineParts(0).trim(), lineParts(1).trim())
-      })
+        Row(lineParts(0).trim(), lineParts(1).trim())
+      }) [RDD[Row]]
 
-    sparkSession.createDataFrame(citationsRDD).toDF("from", "to")
+    sparkSession.createDataFrame(citationsRDD, schemas.citationsSchema)
   }
 
 
