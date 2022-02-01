@@ -5,7 +5,6 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.citegraph.loading.DataFrameLoader
-import org.citegraph.schemas
 
 object Application {
 
@@ -25,7 +24,7 @@ object Application {
   }
 
   def isValidHdfsUri(uri: String): Boolean = {
-    return uri.startsWith("hdfs://")
+    uri.startsWith("hdfs://")
   }
 
   def main(args: Array[String]): Unit = {
@@ -59,8 +58,11 @@ object Application {
 
     val dataframeLoader: DataFrameLoader = new DataFrameLoader(inputDirectory, sparkSession)
     val citationsDF: DataFrame = dataframeLoader.loadCitations()
+    val publishedDatesDF: DataFrame = dataframeLoader.loadPublishedDates()
 
     citationsDF.show(10)
+    publishedDatesDF.show(10)
+
     sparkSession.close()
   }
 
