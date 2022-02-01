@@ -1,6 +1,11 @@
 package org.citegraph
 
-import org.apache.spark.sql.SparkSession
+import org.apache.spark
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.citegraph.loading.DataFrameLoader
+import org.citegraph.schemas
 
 object Application {
 
@@ -19,6 +24,10 @@ object Application {
     println()
   }
 
+  def isValidHdfsUri(uri: String): Boolean = {
+    return uri.startsWith("hdfs://")
+  }
+
   def main(args: Array[String]): Unit = {
     printArgs(args)
     if (args.length != 2) {
@@ -26,16 +35,32 @@ object Application {
       System.exit(1)
     }
 
-    // Make a Spark Session
+    // Validate and fix inputDirectory
+    var inputDirectory: String = args(0)
+    val outputDirectory: String = args(1)
+    if (!isValidHdfsUri(inputDirectory)) {
+      printf("Invalid HDFS input directory: %s\n", inputDirectory)
+      System.exit(1)
+    } else if (!isValidHdfsUri(outputDirectory)) {
+      printf("Invalid HDFS output directory: %s\n", outputDirectory)
+      System.exit(1)
+    }
+
+    if (inputDirectory.endsWith("/")) { // Chop off trailing slash
+      inputDirectory = inputDirectory.substring(0, inputDirectory.length - 1)
+    }
+    printf("inputDirectory: %s, outputDirectory: %s\n", inputDirectory, outputDirectory)
+
+    // Make a SparkSession and SparkContext
     val sparkSession: SparkSession = SparkSession.builder
       .appName("CiteGraph")
       .getOrCreate()
 
-    val inputDirectory: String = args(0)
-    val outputDirectory: String = args(1)
 
-    printf("inputDirectory: %s, outputDirectory: %s\n", inputDirectory, outputDirectory)
+    val dataframeLoader: DataFrameLoader = new DataFrameLoader(inputDirectory, sparkSession)
+    val citationsDF: DataFrame = dataframeLoader.loadCitations()
 
+    citationsDF.show(10)
     sparkSession.close()
   }
 
