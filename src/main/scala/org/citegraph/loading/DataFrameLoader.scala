@@ -20,7 +20,7 @@ class DataFrameLoader(val dataDirectory: String, val sparkSession: SparkSession)
       .filter(line => !line.contains("#") && line.trim().nonEmpty) // Remove lines that contain '#' and empty lines
       .map(line => {
         val lineParts: Array[String] = line.split("\\s+") // Split on whitespace
-        Row(lineParts(0).trim(), lineParts(1).trim())
+        Row(lineParts(0).trim().toInt, lineParts(1).trim().toInt) // Output Row[Integer, Integer]
       })
 
     sparkSession.createDataFrame(citationsRDD, schemas.citationsSchema)
