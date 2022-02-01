@@ -6,7 +6,7 @@ function print_usage {
   echo -e "\tsubmit.sh hdfs://bismarck:30201/cs535/data hdfs://bismarck:30201/cs535/output\n"
 }
 
-if [[ $# -eq 3 ]]; then
+if [[ $# -eq 2 ]]; then
   echo -e "Submitting Spark Job...\n"
   HADOOP_CONF_DIR="$HOME/hadoop" "${SPARK_HOME}"/bin/spark-submit \
     --class org.citegraph.Application \
