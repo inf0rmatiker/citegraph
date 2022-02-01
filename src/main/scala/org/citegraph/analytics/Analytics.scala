@@ -8,9 +8,9 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
   def findDensitiesByYear(): Unit = {
 
-    // Find node density by year - group by year
+    // Find node density by year - group by year and count records
     publishedDatesDF.groupBy(col("year"))
-      .sum("id")
+      .count()
       .show(10)
   }
 
