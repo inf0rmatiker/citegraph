@@ -5,7 +5,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDatesDF: DataFrame) {
 
-
+  /**
+   * Finds the density of both nodes n(t) and edges e(t) for each year t.
+   */
   def findDensitiesByYear(): Unit = {
 
     /*
