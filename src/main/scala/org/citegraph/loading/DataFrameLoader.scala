@@ -39,7 +39,18 @@ class DataFrameLoader(val dataDirectory: String, val sparkSession: SparkSession)
 
   /**
    * Loads the published-dates.txt as a DataFrame, with "id" and "year" columns
-   * @return
+   * @return A Spark SQL Dataframe like the following:
+      +-------+----+
+      |     id|year|
+      +-------+----+
+      |9203201|1992|
+      |9203202|1992|
+      |9203203|1992|
+      |9203204|1992|
+      |9203205|1992|
+      |9203206|1992|
+      |...    |... |
+      +-------+----+
    */
   def loadPublishedDates(): DataFrame = {
     val sparkContext: SparkContext = sparkSession.sparkContext
