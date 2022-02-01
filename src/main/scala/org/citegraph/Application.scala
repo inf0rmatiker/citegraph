@@ -4,6 +4,7 @@ import org.apache.spark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.citegraph.analytics.Analytics
 import org.citegraph.loading.DataFrameLoader
 
 object Application {
@@ -60,8 +61,8 @@ object Application {
     val citationsDF: DataFrame = dataframeLoader.loadCitations()
     val publishedDatesDF: DataFrame = dataframeLoader.loadPublishedDates()
 
-    citationsDF.show(10)
-    publishedDatesDF.show(10)
+    val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
+    analytics.findDensitiesByYear()
 
     sparkSession.close()
   }
