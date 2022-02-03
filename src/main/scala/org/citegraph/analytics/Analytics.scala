@@ -1,14 +1,14 @@
 package org.citegraph.analytics
 
 import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
 class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDatesDF: DataFrame) {
 
   /**
    * Finds the density of both nodes n(t) and edges e(t) for each year t.
    */
-  def findDensitiesByYear(): Unit = {
+  def findDensitiesByYear(): DataFrame = {
 
     /*
     Find node density by year - group by year and count records:
@@ -23,9 +23,6 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
      */
     publishedDatesDF.groupBy(col("year"))
       .count()
-      .show()
-
-
   }
 
 

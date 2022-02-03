@@ -1,11 +1,9 @@
 package org.citegraph
 
-import org.apache.spark
-import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.citegraph.analytics.Analytics
 import org.citegraph.loading.DataFrameLoader
+import org.citegraph.saving.DataFrameSaver
 
 object Application {
 
@@ -56,13 +54,18 @@ object Application {
       .appName("CiteGraph")
       .getOrCreate()
 
-
+    // Load in citations and publication dates as Spark DataFrames
     val dataframeLoader: DataFrameLoader = new DataFrameLoader(inputDirectory, sparkSession)
     val citationsDF: DataFrame = dataframeLoader.loadCitations()
     val publishedDatesDF: DataFrame = dataframeLoader.loadPublishedDates()
 
+    // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
-    analytics.findDensitiesByYear()
+    val densities: DataFrame = analytics.findDensitiesByYear()
+
+    // Save DataFrames as .csv files to HDFS output directory
+    val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
+    dataframeSaver.saveSortedAsCsv(filename = "densities.csv", densities, sortByCol = "year")
 
     sparkSession.close()
   }
