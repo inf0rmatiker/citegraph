@@ -36,6 +36,7 @@ object Application {
     // Validate and fix inputDirectory
     var inputDirectory: String = args(0)
     val outputDirectory: String = args(1)
+
     if (!isValidHdfsUri(inputDirectory)) {
       printf("Invalid HDFS input directory: %s\n", inputDirectory)
       System.exit(1)
