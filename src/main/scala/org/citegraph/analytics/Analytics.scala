@@ -97,4 +97,25 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .select("year", "n(t)", "e(t)")
   }
 
+  /**
+   * Finds the effective diameter of the graph for each year t.
+   */
+  def findDiametersByYear(): DataFrame = {
+    // 1. Create bi-directional version of citations
+    // 2. Generate neighboring nodes list for each node
+    // 3. Generate list of paths with length = 2
+    // 4. Remove duplicate paths and paths that are not the shortest (i.e., where a shorter path exists between start and end nodes) from #3
+    //    - For each path length list, create pairRDD with key = source~destination and value = path and sort it by key
+    //    - Use subtractByKey between path length list and the path length list with one less edge (e.g., between path = 1 and path =2)
+
+    val swappedColsCitationsDF = citationsDF
+      .withColumn("to-new", citationsDF("from"))
+      .drop("from")
+      .withColumnRenamed("to", "from")
+      .withColumnRenamed("to-new", "to")
+
+    val bidirectionalCitationsDF = citationsDF.union(swappedColsCitationsDF)
+    return bidirectionalCitationsDF
+  }
+
 }

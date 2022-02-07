@@ -37,21 +37,24 @@ object Application {
     var inputDirectory: String = args(0)
     val outputDirectory: String = args(1)
 
-    if (!isValidHdfsUri(inputDirectory)) {
-      printf("Invalid HDFS input directory: %s\n", inputDirectory)
-      System.exit(1)
-    } else if (!isValidHdfsUri(outputDirectory)) {
-      printf("Invalid HDFS output directory: %s\n", outputDirectory)
-      System.exit(1)
-    }
-
-    if (inputDirectory.endsWith("/")) { // Chop off trailing slash
-      inputDirectory = inputDirectory.substring(0, inputDirectory.length - 1)
-    }
+    // TODO: Uncomment these lines
+//    if (!isValidHdfsUri(inputDirectory)) {
+//      printf("Invalid HDFS input directory: %s\n", inputDirectory)
+//      System.exit(1)
+//    } else if (!isValidHdfsUri(outputDirectory)) {
+//      printf("Invalid HDFS output directory: %s\n", outputDirectory)
+//      System.exit(1)
+//    }
+//
+//    if (inputDirectory.endsWith("/")) { // Chop off trailing slash
+//      inputDirectory = inputDirectory.substring(0, inputDirectory.length - 1)
+//    }
     printf("inputDirectory: %s, outputDirectory: %s\n", inputDirectory, outputDirectory)
 
     // Make a SparkSession and SparkContext
     val sparkSession: SparkSession = SparkSession.builder
+      // TODO: remove this line
+      .master("local")
       .appName("CiteGraph")
       .getOrCreate()
 
@@ -62,11 +65,18 @@ object Application {
 
     // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
-    val densities: DataFrame = analytics.findDensitiesByYear()
+    // TODO: uncomment this line
+//    val densities: DataFrame = analytics.findDensitiesByYear()
 
-    // Save DataFrames as .csv files to HDFS output directory
-    val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
-    dataframeSaver.saveSortedAsCsv(filename = "densities.csv", densities, sortByCol = "year")
+    // Get analytics on graph diameters
+    val diameters = analytics.findDiametersByYear()
+    // TODO: remove this line
+    diameters.show()
+
+    // TODO: Uncomment these lines
+//    // Save DataFrames as .csv files to HDFS output directory
+//    val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
+//    dataframeSaver.saveSortedAsCsv(filename = "densities.csv", densities, sortByCol = "year")
 
     sparkSession.close()
   }

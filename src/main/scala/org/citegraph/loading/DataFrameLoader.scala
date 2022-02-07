@@ -7,7 +7,9 @@ import org.citegraph.schemas.{citationsSchema, publishedDatesSchema}
 
 class DataFrameLoader(val dataDirectory: String, val sparkSession: SparkSession) {
 
-  val CITATIONS_TXT_STR : String = "citations.txt"
+  // TODO: Fix these lines
+//  val CITATIONS_TXT_STR : String = "citations.txt"
+  val CITATIONS_TXT_STR : String = "citations-test.txt"
   val PUBLISHED_DATES_TXT_STR : String = "published-dates.txt"
 
   /**
