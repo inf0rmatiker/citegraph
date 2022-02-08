@@ -98,13 +98,34 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
      */
     val edgesByYearDF: DataFrame = getEdgeCountsByYear(edgeCountsDF)
 
-
+    /*
+      +----+------+
+      |year|  e(t)|
+      +----+------+
+      |1992|   170|
+      |1993|  2919|
+      |1994| 11568|
+      |... |...   |
+      +----+------+
+     */
     val runningTotalEdgeCounts: DataFrame = calculateRunningTotals("year", "e(t)", edgesByYearDF)
     runningTotalEdgeCounts.show()
 
     val nodeCounts: DataFrame = getNodeCountsByYear
     val runningTotalNodeCounts = calculateRunningTotals("nodeYear", "n(t)", nodeCounts)
 
+    /*
+    Join node and edge count DataFrames together by their year:
+      +----+-----+------+
+      |year| n(t)|  e(t)|
+      +----+-----+------+
+      |1992|  855|   170|
+      |1993| 2852|  2919|
+      |1994| 5746| 11568|
+      |1995| 9190| 30161|
+      |... |...  |...   |
+      +----+-----+------+
+     */
     runningTotalNodeCounts
       .join(runningTotalEdgeCounts, runningTotalNodeCounts("nodeYear") === runningTotalEdgeCounts("year"))
       .select("year", "n(t)", "e(t)")
