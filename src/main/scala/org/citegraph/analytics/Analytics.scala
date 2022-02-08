@@ -131,4 +131,8 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .select("year", "n(t)", "e(t)")
   }
 
+  def findNodePairsConnectedByNEdges(edgeCount: Int, year: Int): DataFrame = {
+    citationsDF
+  }
+
 }

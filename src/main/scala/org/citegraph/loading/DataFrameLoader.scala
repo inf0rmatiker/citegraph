@@ -70,7 +70,7 @@ class DataFrameLoader(val dataDirectory: String, val sparkSession: SparkSession)
         Row(rawPublishedId.toInt, year) // Output Row[Integer, Integer]
       })
 
-    sparkSession.createDataFrame(publishedDatesRDD, publishedDatesSchema).na.drop()
+    sparkSession.createDataFrame(publishedDatesRDD, publishedDatesSchema).na.drop().dropDuplicates("id")
   }
 
 
