@@ -31,6 +31,7 @@ class DataFrameLoader(val dataDirectory: String, val sparkSession: SparkSession)
       .filter(line => !line.contains("#") && line.trim().nonEmpty) // Remove lines that contain '#' and empty lines
       .map(line => {
         val lineParts: Array[String] = line.split("\\s+") // Split on whitespace
+        // Question: Does this remove lines with null values for from or to column?
         Row(lineParts(0).trim().toInt, lineParts(1).trim().toInt) // Output Row[Integer, Integer]
       })
 
@@ -58,6 +59,7 @@ class DataFrameLoader(val dataDirectory: String, val sparkSession: SparkSession)
       .filter(line => !line.contains("#") && line.trim().nonEmpty) // Remove lines that contain '#' and empty lines
       .map(line => {
         val lineParts: Array[String] = line.split("\\s+") // Split on whitespace
+        // Question: Could we use df.select(year('dt').alias('year')) to do this work?
         val year: Int = lineParts(1).trim().substring(0, 4).toInt // Only take first 4 digits of yyyy-mm-dd
 
         // For cross-listed papers, which have id 11<true_id>, just take the true id
