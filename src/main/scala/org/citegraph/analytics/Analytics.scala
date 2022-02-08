@@ -15,12 +15,78 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
   }
 
   /**
-   * Use from IDs to join to publishedDatesDF and match edge counts to years
+   * Use "from" IDs to join to publishedDatesDF and match edge counts to years, producing the following DataFrame:
+      +----+------+
+      |year|  e(t)|
+      +----+------+
+      |1992|   170|
+      |1993|  2919|
+      |1994| 11568|
+      |... |...   |
+      +----+------+
    */
   def getEdgeCountsByYear(df: DataFrame): DataFrame = {
+    publishedDatesDF
+      .join(df, publishedDatesDF("id") === df("from"))  // Inner join to publishedDates on the paper id
+      .select("year", "count")  // Select only the "year" and "count" columns
+      .groupBy("year").sum("count")  // Group by "year" and sum up the counts
+      .sort(col("year"))  // Sort by "year"
+      .withColumnRenamed("sum(count)", "e(t)")  // Rename "sum(count)" column to "e(t)"
+  }
+
+  /**
+   * Gets the total node count for each given year, producing the following DataFrame:
+      +----+-----+
+      |year| n(t)|
+      +----+-----+
+      |1993| 2852|
+      |1994| 5746|
+      |1995| 9190|
+      |... |...  |
+      +----+-----+
+   */
+  def getNodeCountsByYear: DataFrame = {
+    publishedDatesDF
+      .groupBy(col("year")).count()  // Group by "year", taking the count()
+      .withColumnRenamed("count", "n(t)")  // Rename "count" to "n(t)"
+      .withColumnRenamed("year", "nodeYear")  // Rename "year" to "nodeYear"
+  }
+
+  /**
+   * Finds the density of both nodes n(t) and edges e(t) for each year t, producing the following DataFrame:
+      +----+-----+------+
+      |year| n(t)|  e(t)|
+      +----+-----+------+
+      |1992|  855|   170|
+      |1993| 2852|  2919|
+      |1994| 5746| 11568|
+      |1995| 9190| 30161|
+      |... |...  |...   |
+      +----+-----+------+
+   */
+  def findDensitiesByYear(): DataFrame = {
 
     /*
-    Get edge counts by year - group by year and count records with running total:
+    Find node and edge density by year - group by year and count records with running total:
+     */
+
+    /*
+      Group by the from column, using the aggregate count().
+      +-------+-----+
+      |   from|count|
+      +-------+-----+
+      |9801317|    4|
+      |   8086|    6|
+      |9510372|   15|
+      |9310298|    1|
+      |9710374|   14|
+      |9606386|   36|
+      |...    |...  |
+      +-------+-----+
+     */
+    val edgeCountsDF: DataFrame = citationsDF.groupBy(col("from")).count()
+
+    /*
       +----+------+
       |year|  e(t)|
       +----+------+
@@ -30,48 +96,26 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       |... |...   |
       +----+------+
      */
-
-    publishedDatesDF
-      .join(df, publishedDatesDF("id") === df("from"))
-      .select("year", "count")
-      .groupBy("year")
-      .sum("count")
-      .sort(col("year"))
-      //      .withColumnRenamed("year", "edgeYear")
-      .withColumnRenamed("sum(count)", "e(t)")
-  }
-
-  /**
-   * Group by year, count and rename columns
-   */
-  def getNodeCountsByYear(): DataFrame = {
+    val edgesByYearDF: DataFrame = getEdgeCountsByYear(edgeCountsDF)
 
     /*
-    Get node counts by year - group by year and count records with running total:
-      +----+-----+
-      |year| n(t)|
-      +----+-----+
-      |1993| 2852|
-      |1994| 5746|
-      |1995| 9190|
-      |... |...  |
-      +----+-----+
+      +----+------+
+      |year|  e(t)|
+      +----+------+
+      |1992|   170|
+      |1993|  2919|
+      |1994| 11568|
+      |... |...   |
+      +----+------+
      */
+    val runningTotalEdgeCounts: DataFrame = calculateRunningTotals("year", "e(t)", edgesByYearDF)
+    runningTotalEdgeCounts.show()
 
-    publishedDatesDF
-      .groupBy(col("year"))
-      .count()
-      .withColumnRenamed("count", "n(t)")
-      .withColumnRenamed("year", "nodeYear")
-  }
-
-  /**
-   * Finds the density of both nodes n(t) and edges e(t) for each year t.
-   */
-  def findDensitiesByYear(): DataFrame = {
+    val nodeCounts: DataFrame = getNodeCountsByYear
+    val runningTotalNodeCounts = calculateRunningTotals("nodeYear", "n(t)", nodeCounts)
 
     /*
-    Find node and edge density by year - group by year and count records with running total:
+    Join node and edge count DataFrames together by their year:
       +----+-----+------+
       |year| n(t)|  e(t)|
       +----+-----+------+
@@ -82,19 +126,13 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       |... |...  |...   |
       +----+-----+------+
      */
-
-    val edgeCountsDF = citationsDF.groupBy(col("from")).count()
-
-    val edgesByYearDF = getEdgeCountsByYear(edgeCountsDF)
-
-    val runningTotalEdgeCounts = calculateRunningTotals("year", "e(t)", edgesByYearDF)
-
-    val nodeCounts = getNodeCountsByYear()
-    val runningTotalNodeCounts = calculateRunningTotals("nodeYear", "n(t)", nodeCounts)
-
     runningTotalNodeCounts
       .join(runningTotalEdgeCounts, runningTotalNodeCounts("nodeYear") === runningTotalEdgeCounts("year"))
       .select("year", "n(t)", "e(t)")
+  }
+
+  def findNodePairsConnectedByNEdges(edgeCount: Int, year: Int): DataFrame = {
+    citationsDF
   }
 
 }
