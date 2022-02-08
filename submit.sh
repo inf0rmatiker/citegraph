@@ -8,7 +8,7 @@ function print_usage {
 
 if [[ $# -eq 2 ]]; then
   echo -e "Submitting Spark Job...\n"
-  HADOOP_CONF_DIR="$HOME/hadoop" "${SPARK_HOME}"/bin/spark-submit \
+  "${SPARK_HOME}"/bin/spark-submit \
     --class org.citegraph.Application \
     --master spark://bismarck:9079 \
     --deploy-mode cluster \
