@@ -143,16 +143,18 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
   def findNodePairsConnectedByNEdges(edgeCount: Int, year: Int): DataFrame = {
 
     import sparkSession.implicits._
-    val invertedCitationsDF: DataFrame = citationsDF
+    val bidirectionalEdgesDF: DataFrame = citationsDF
       .alias("invertedCitationsDF")  // Make a copy of citationsDF
       .map(row => {
         val from_original: Int = row.getInt(0)
         val to_original: Int = row.getInt(1)
-        (to_original, from_original)  // Flip the from, to -> to, from
-      }).toDF("from", "to")
+        (to_original, from_original)  // Flip the (from, to) -> (to, from)
+      }).toDF("from", "to")  // Convert to Dataset (ignore the toDF function name)
+      .union(citationsDF)  // Union back with the original citations DF
 
-    invertedCitationsDF.show()
-    invertedCitationsDF
+    printf("citationsDF size: %d, bidirectionalEdgesDF size: %d\n", citationsDF.count(), bidirectionalEdgesDF.count())
+    bidirectionalEdgesDF.show()
+    bidirectionalEdgesDF
   }
 
 }
