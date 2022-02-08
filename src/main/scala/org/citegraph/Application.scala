@@ -62,11 +62,11 @@ object Application {
 
     // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
-    val densities: DataFrame = analytics.findDensitiesByYear()
-
+    //val densities: DataFrame = analytics.findDensitiesByYear()
+    analytics.findNodePairsConnectedByNEdges(edgeCount = 0, year = 1995)
     // Save DataFrames as .csv files to HDFS output directory
-    val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
-    dataframeSaver.saveSortedAsCsv(filename = "densities.csv", densities, sortByCol = "year")
+    //val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
+    //dataframeSaver.saveSortedAsCsv(filename = "densities.csv", densities, sortByCol = "year")
 
     sparkSession.close()
   }

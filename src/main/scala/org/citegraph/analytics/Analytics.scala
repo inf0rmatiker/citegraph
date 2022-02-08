@@ -6,6 +6,11 @@ import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
 class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDatesDF: DataFrame) {
 
+
+  /* -------------------------------------------------------------------------------------------
+    Question 1 Functions: TODO: Remove this banner. This is just to temporarily help organize
+   --------------------------------------------------------------------------------------------*/
+
   /**
    * Calculate running totals of densities
    */
@@ -131,8 +136,23 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .select("year", "n(t)", "e(t)")
   }
 
+  /* -------------------------------------------------------------------------------------------
+    Question 2 Functions: TODO: Remove this banner. This is just to temporarily help organize
+   --------------------------------------------------------------------------------------------*/
+
   def findNodePairsConnectedByNEdges(edgeCount: Int, year: Int): DataFrame = {
-    citationsDF
+
+    import sparkSession.implicits._
+    val invertedCitationsDF: DataFrame = citationsDF
+      .alias("invertedCitationsDF")  // Make a copy of citationsDF
+      .map(row => {
+        val from_original: Int = row.getInt(0)
+        val to_original: Int = row.getInt(1)
+        (to_original, from_original)  // Flip the from, to -> to, from
+      }).toDF("from", "to")
+
+    invertedCitationsDF.show()
+    invertedCitationsDF
   }
 
 }
