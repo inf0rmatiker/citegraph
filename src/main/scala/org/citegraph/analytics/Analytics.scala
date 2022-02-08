@@ -143,6 +143,21 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
   def findNodePairsConnectedByNEdges(edgeCount: Int, year: Int): DataFrame = {
 
     import sparkSession.implicits._
+
+    /*
+    Create bi-directional edges for the citationsDF:
+      +-------+-------+       +-------+-------+
+      |   from|     to|       |   from|     to|
+      +-------+-------+       +-------+-------+
+      |      2|      1|       |      2|      1|
+      |      3|      2|       |      1|      2|
+      |      3|      1|  -->  |      3|      2|
+      |    ...|    ...|       |      2|      3|
+      +-------+-------+       |      3|      1|
+                              |      1|      3|
+                              |    ...|    ...|
+                              +-------+-------+
+     */
     val bidirectionalEdgesDF: DataFrame = citationsDF
       .alias("invertedCitationsDF")  // Make a copy of citationsDF
       .map(row => {
@@ -152,8 +167,17 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       }).toDF("from", "to")  // Convert to Dataset (ignore the toDF function name)
       .union(citationsDF)  // Union back with the original citations DF
 
-    printf("citationsDF size: %d, bidirectionalEdgesDF size: %d\n", citationsDF.count(), bidirectionalEdgesDF.count())
-    bidirectionalEdgesDF.show()
+    // citationsDF size: 421,578, bidirectionalEdgesDF size: 843,156
+    printf("citationsDF size: %,d, bidirectionalEdgesDF size: %,d\n", citationsDF.count(), bidirectionalEdgesDF.count())
+
+
+    val filteredByYear: DataFrame = bidirectionalEdgesDF.join(
+      publishedDatesDF,
+      bidirectionalEdgesDF("from") === publishedDatesDF("id")
+    )
+
+    filteredByYear.show()
+
     bidirectionalEdgesDF
   }
 
