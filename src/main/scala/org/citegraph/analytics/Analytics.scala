@@ -1,5 +1,6 @@
 package org.citegraph.analytics
 
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, sum}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
@@ -98,15 +99,9 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
   }
 
   /**
-   * Finds the effective diameter of the graph for each year t.
+   * Copies citations in reverse order and creates a new dataframe with original and reversed citations
    */
-  def findDiametersByYear(): DataFrame = {
-    // 1. Create bi-directional version of citations
-    // 2. Generate neighboring nodes list for each node
-    // 3. Generate list of paths with length = 2
-    // 4. Remove duplicate paths and paths that are not the shortest (i.e., where a shorter path exists between start and end nodes) from #3
-    //    - For each path length list, create pairRDD with key = source~destination and value = path and sort it by key
-    //    - Use subtractByKey between path length list and the path length list with one less edge (e.g., between path = 1 and path =2)
+  def generateBidirectionalGraph(): DataFrame = {
 
     val swappedColsCitationsDF = citationsDF
       .withColumn("to-new", citationsDF("from"))
@@ -114,7 +109,40 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .withColumnRenamed("to", "from")
       .withColumnRenamed("to-new", "to")
 
-    val bidirectionalCitationsDF = citationsDF.union(swappedColsCitationsDF)
+    citationsDF.union(swappedColsCitationsDF)
+  }
+
+  /**
+   * Creates a new dataframe with list of each node and all of its direct neighbors
+   */
+  def generateNodeNeighborsList(nodeList: DataFrame): Array[(Any, List[Any])] = {
+
+    val neighborList = nodeList.rdd.map(row => {
+      (row(0), List(row(1)))
+    })
+
+    neighborList.reduceByKey(_ ::: _).collect()
+  }
+
+  /**
+   * Finds the effective diameter of the graph for each year t.
+   */
+  def findDiametersByYear(): DataFrame = {
+    // X 1. Create bi-directional version of citations
+    // X 2. Generate neighboring nodes list for each node
+    // 3. Generate list of paths with length = 2
+    // 4. Remove duplicate paths and paths that are not the shortest (i.e., where a shorter path exists between start and end nodes) from #3
+    //    - For each path length list, create pairRDD with key = source~destination and value = path and sort it by key
+    //    - Use subtractByKey between path length list and the path length list with one less edge (e.g., between path = 1 and path =2)
+
+    val bidirectionalCitationsDF = generateBidirectionalGraph()
+//    return bidirectionalCitationsDF
+
+    val nodeNeighbors = generateNodeNeighborsList(bidirectionalCitationsDF)
+//    nodeNeighbors.foreach(row => {
+//      println(row)
+//    })
+//    return nodeNeighbors
     return bidirectionalCitationsDF
   }
 

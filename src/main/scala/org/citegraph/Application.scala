@@ -71,7 +71,7 @@ object Application {
     // Get analytics on graph diameters
     val diameters = analytics.findDiametersByYear()
     // TODO: remove this line
-    diameters.show()
+    diameters.show(40,false)
 
     // TODO: Uncomment these lines
 //    // Save DataFrames as .csv files to HDFS output directory
