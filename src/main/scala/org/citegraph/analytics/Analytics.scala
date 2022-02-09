@@ -174,7 +174,13 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     val filteredByYear: DataFrame = bidirectionalEdgesDF.join(
       publishedDatesDF,
       bidirectionalEdgesDF("from") === publishedDatesDF("id")
-    )
+    ).drop(col("id"))
+      .withColumnRenamed(existingName = "year", newName = "fromYear")
+      .filter($"fromYear" <= year)
+      .join(
+        publishedDatesDF,
+        bidirectionalEdgesDF("to") === publishedDatesDF("id")
+      ).withColumnRenamed(existingName = "year", newName = "fromYear")
 
     filteredByYear.show()
 
