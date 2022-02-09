@@ -140,7 +140,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     Question 2 Functions: TODO: Remove this banner. This is just to temporarily help organize
    --------------------------------------------------------------------------------------------*/
 
-  def findNodePairsConnectedByNEdges(edgeCount: Int, year: Int): DataFrame = {
+  def findGraphDiameterByYear(edgeCount: Int, year: Int): DataFrame = {
 
     import sparkSession.implicits._
 
@@ -170,7 +170,10 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     // citationsDF size: 421,578, bidirectionalEdgesDF size: 843,156
     printf("citationsDF size: %,d, bidirectionalEdgesDF size: %,d\n", citationsDF.count(), bidirectionalEdgesDF.count())
 
-
+    /*
+     Filter all the edge pairs by only allowing pairs where both the "from" and the "to" ids are
+     equal to or less than the given "year" parameter:
+     */
     val filteredByYear: DataFrame = bidirectionalEdgesDF.join(
       publishedDatesDF,
       bidirectionalEdgesDF("from") === publishedDatesDF("id")
@@ -180,7 +183,9 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .join(
         publishedDatesDF,
         bidirectionalEdgesDF("to") === publishedDatesDF("id")
-      ).withColumnRenamed(existingName = "year", newName = "fromYear")
+      ).drop(col("id"))
+      .withColumnRenamed(existingName = "year", newName = "toYear")
+      .filter($"toYear" <= year)
 
     filteredByYear.show()
 
