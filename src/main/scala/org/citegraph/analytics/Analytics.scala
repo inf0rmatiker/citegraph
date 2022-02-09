@@ -173,6 +173,15 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     /*
      Filter all the edge pairs by only allowing pairs where both the "from" and the "to" ids are
      equal to or less than the given "year" parameter:
+      +-------+-------+--------+------+
+      |   from|     to|fromYear|toYear|
+      +-------+-------+--------+------+
+      |9409356|9301254|    1994|  1993|
+      |9502280|9301254|    1995|  1993|
+      |9404228|9301254|    1994|  1993|
+      |9407347|9301254|    1994|  1993|
+      |    ...|    ...|     ...|   ...|
+      +-------+-------+--------+------+
      */
     val filteredByYear: DataFrame = bidirectionalEdgesDF.join(
       publishedDatesDF,
