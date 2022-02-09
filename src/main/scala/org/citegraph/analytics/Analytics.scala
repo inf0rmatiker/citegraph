@@ -196,13 +196,29 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .withColumnRenamed(existingName = "year", newName = "toYear")
       .filter($"toYear" <= year)
 
-
-    val adjacencyListDF: DataFrame = filteredByYearDF.drop("fromYear", "toYear")
-      .map(row => {
+    /*
+     Creates an id -> [adjacency list] mapping for nodes 1 edge away.
+      +-------+--------------------+
+      |     id|           neighbors|
+      +-------+--------------------+
+      |9501400|[9401341, 9210224...|
+      |9405400|[9511399, 9510283...|
+      |9509400|[9305287, 9302302...|
+      |9403400|           [9509378]|
+      |9406400|  [9410338, 9310210]|
+      |9504400|[9209277, 9410240...|
+      |9502400|[9505210, 9508402...|
+      |9407400|  [9403328, 9501246]|
+      |9512400|[9311222, 9501394...|
+      |    ...|                 ...|
+      +-------+--------------------+
+     */
+    val adjacencyListDF: DataFrame = filteredByYearDF.drop("fromYear", "toYear")  // Drop the year cols from above
+      .map(row => {  // Convert all the "to" values to a Scala List containing the "to" value
         (row.getInt(0), List(row.getInt(1)))
-      }).rdd.reduceByKey((a: List[Int], b: List[Int]) => {
-        a ::: b  // Merge both lists
-      }).toDF("id", "neighbors")
+      }).rdd.reduceByKey((a: List[Int], b: List[Int]) => {  // Convert to rdd so we can use reduceByKey API
+        a ::: b  // Merge all the Lists sharing the same "from" key ( ":::" is a Scala List merge operator )
+      }).toDF("id", "neighbors")  // Convert back to DataFrame with new column titles
 
     adjacencyListDF.show()
 
