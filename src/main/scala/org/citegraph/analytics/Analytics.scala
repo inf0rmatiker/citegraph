@@ -183,7 +183,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       |    ...|    ...|     ...|   ...|
       +-------+-------+--------+------+
      */
-    val filteredByYear: DataFrame = bidirectionalEdgesDF.join(
+    val filteredByYearDF: DataFrame = bidirectionalEdgesDF.join(
       publishedDatesDF,
       bidirectionalEdgesDF("from") === publishedDatesDF("id")
     ).drop(col("id"))
@@ -196,7 +196,15 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .withColumnRenamed(existingName = "year", newName = "toYear")
       .filter($"toYear" <= year)
 
-    filteredByYear.show()
+
+    val adjacencyListDF: DataFrame = filteredByYearDF.drop("fromYear", "toYear")
+      .map(row => {
+        (row.getInt(0), List(row.getInt(1)))
+      }).rdd.reduceByKey((a: List[Int], b: List[Int]) => {
+        a ::: b  // Merge both lists
+      }).toDF("id", "neighbors")
+
+    adjacencyListDF.show()
 
     bidirectionalEdgesDF
   }
