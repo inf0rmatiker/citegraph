@@ -204,15 +204,15 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       val from: Int = row.getInt(0)
       val to: Int = row.getInt(1)
       val key: String = "%d~%d".format(from, to)
-      val value: List[Int] = List(from, to)
+      val value: Array[Int] = Array(from, to)
       (key, value)
     }).toDF("endpoints", "path")
 
     // Collect to array of rows
     val shortestPathsOneArray: Array[Row] = shortestPathsOfLengthOne.collect()
-    val shortestPathsMap: mutable.Map[String, List[Int]] = mutable.Map()
+    val shortestPathsMap: mutable.Map[String, Array[Int]] = mutable.Map()
     for (row: Row <- shortestPathsOneArray)
-      shortestPathsMap += (row.getString(0) -> row.getList(1))
+      shortestPathsMap += (row.getString(0) -> row.getAs[Array[Int]](1))
 
     shortestPathsMap.foreach{ i =>
       printf("%s -> %s\n", i._1, i._2)
