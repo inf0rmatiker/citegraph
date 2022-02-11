@@ -4,6 +4,9 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, sum}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
+import scala.collection.mutable
+import scala.collection.mutable.Map
+
 class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDatesDF: DataFrame) {
 
 
@@ -204,6 +207,17 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       val value: String = "%d %d".format(from, to)
       (key, value)
     }).toDF("endpoints", "path")
+
+    // Collect to array of rows
+    val shortestPathsOneArray: Array[Row] = shortestPathsOfLengthOne.collect()
+    val shortestPathsMap: mutable.Map[String, Array[Int]] = mutable.Map()
+    for (row: Row <- shortestPathsOneArray) shortestPathsMap += (row.getInt(0) -> row.getString(1).split("\\s+"))
+    shortestPathsMap.foreach{ i =>
+      printf("%s -> %s\n", i._1, i._2.mkString("Array(", ", ", ")") )
+    }
+
+
+
 
     shortestPathsOfLengthOne.show()
 
