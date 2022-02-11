@@ -195,6 +195,17 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       ).drop(col("id"))
       .withColumnRenamed(existingName = "year", newName = "toYear")
       .filter($"toYear" <= year)
+      .drop("fromYear", "toYear")
+
+    val shortestPathsOfLengthOne: DataFrame = filteredByYearDF.map(row => {
+      val from: Int = row.getInt(0)
+      val to: Int = row.getInt(1)
+      val key: String = "%d~%d".format(from, to)
+      val value: String = "%d %d".format(from, to)
+      (key, value)
+    }).toDF("endpoints", "path")
+
+    shortestPathsOfLengthOne.show()
 
     /*
      Creates an id -> [adjacency list] mapping for nodes 1 edge away.
@@ -220,7 +231,6 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         a ::: b  // Merge all the Lists sharing the same "from" key ( ":::" is a Scala List merge operator )
       }).toDF("id", "neighbors")  // Convert back to DataFrame with new column titles
 
-    adjacencyListDF.show()
 
     bidirectionalEdgesDF
   }
