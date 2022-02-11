@@ -211,7 +211,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     // Collect to array of rows
     val shortestPathsOneArray: Array[Row] = shortestPathsOfLengthOne.collect()
     val shortestPathsMap: mutable.Map[String, Array[Int]] = mutable.Map()
-    for (row: Row <- shortestPathsOneArray) shortestPathsMap += (row.getInt(0) -> row.getString(1).split("\\s+"))
+    for (row: Row <- shortestPathsOneArray) shortestPathsMap += (row.getString(0) -> row.getString(1).split("\\s+"))
     shortestPathsMap.foreach{ i =>
       printf("%s -> %s\n", i._1, i._2.mkString("Array(", ", ", ")") )
     }
