@@ -204,8 +204,8 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     val shortestPathsOfLengthOne: RDD[(String, Array[Int])] = filteredByYearDF.map(row => {
       var from: Int = row.getInt(0)
       var to: Int = row.getInt(1)
-      val key: String = "%d~%d".format(from, to)
       if (to < from) { val temp = from; from = to; to = temp; } // Swap if to < from
+      val key: String = "%d~%d".format(from, to)
       val value: Array[Int] = Array(from, to)
       (key, value)
     }).rdd
