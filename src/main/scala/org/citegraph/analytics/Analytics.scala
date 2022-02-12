@@ -250,6 +250,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     })
 
     val adjacencyMap: Map[Int, Array[Int]] = adjacencyList.collectAsMap()
+    printAdjacencyMap(adjacencyMap)
 
     val pathsOfLengthTwo: RDD[(String, Array[Int])] = adjacencyList.flatMap(row => {
       val id: Int = row._1
@@ -322,6 +323,15 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     collected.foreach{ x =>
       val arrayStr: String = x._2.mkString("Array(",",",")")
       sb.append("\t(\"%s\", %s)\n".format(x._1, arrayStr))
+    }
+    println(sb.toString())
+  }
+
+  def printAdjacencyMap(adjacencyMap: Map[Int, Array[Int]]): Unit = {
+    val sb: mutable.StringBuilder = mutable.StringBuilder.newBuilder
+    sb.append("AdjacencyMap:\n")
+    adjacencyMap.keys.foreach{ key =>
+      sb.append("\t(%d -> %s)\n".format(key, adjacencyMap(key).mkString("Array(",",",")")))
     }
     println(sb.toString())
   }
