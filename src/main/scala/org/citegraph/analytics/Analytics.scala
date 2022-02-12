@@ -305,7 +305,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
   def generateNextShortestPaths(nextPathLength: Int, currentShortestPaths: RDD[(String, Array[Int])],
                                 adjacencyMap: Map[Int, Array[Int]]): RDD[(String, Array[Int])] = {
-    currentShortestPaths.filter(row => row._2.length == nextPathLength).flatMap{
+    var nextIteration: RDD[(String, Array[Int])] = currentShortestPaths.filter(row => row._2.length == nextPathLength).flatMap{
         case(endpoints: String, path: Array[Int]) =>
           var edges: ListBuffer[String] = ListBuffer()
           val firstElement: Int = path(0)
@@ -322,11 +322,14 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
           }
           edges.toList
       }.map(encodedString => {
-      val parts: Array[String] = encodedString.split(":")
-      val endpoints: String = parts(0)
-      val path: Array[Int] = parts(1).split(",").map(_.toInt)
-      (endpoints, path)
-    })
+        val parts: Array[String] = encodedString.split(":")
+        val endpoints: String = parts(0)
+        val path: Array[Int] = parts(1).split(",").map(_.toInt)
+        (endpoints, path)
+      })
+
+    collectAndPrintPairRDD(nextIteration, s"Iteration $nextPathLength")
+    nextIteration
   }
 
   def collectAndPrintPairRDD(pairRDD: RDD[(String, Array[Int])], name: String): Unit = {
