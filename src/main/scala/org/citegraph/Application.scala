@@ -73,7 +73,7 @@ object Application {
     // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
     //val densities: DataFrame = analytics.findDensitiesByYear()
-    val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(year = 1998, debug = isTestingEnv)
+    val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(year = 1993, debug = isTestingEnv)
     print("tableByYear:\n")
     tableByYear.foreach{println}
 
