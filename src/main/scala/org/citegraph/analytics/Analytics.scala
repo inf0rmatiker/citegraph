@@ -145,7 +145,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     Question 2 Functions: TODO: Remove this banner. This is just to temporarily help organize
    --------------------------------------------------------------------------------------------*/
 
-  def findGraphDiameterByYear(edgeCount: Int, year: Int): DataFrame = {
+  def findGraphDiameterByYear(year: Int): List[(Int, Long)] = {
 
     import sparkSession.implicits._
 
@@ -210,16 +210,6 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       val value: Array[Int] = Array(from, to)
       (key, value)
     }).rdd
-
-    // Collect to array of rows
-//    val shortestPathsOneArray: Array[Row] = shortestPathsOfLengthOne.collect()
-//    val shortestPathsMap: mutable.Map[String, Array[Int]] = mutable.Map()
-//    for (row: Row <- shortestPathsOneArray)
-//      shortestPathsMap += (row.getString(0) -> row.getAs[Array[Int]](1))
-//
-//    shortestPathsMap.foreach{ i =>
-//      printf("%s -> %s\n", i._1, i._2)
-//    }
 
     collectAndPrintPairRDD(shortestPathsOfLengthOne, "shortestPathsOfLengthOne")
 
@@ -286,27 +276,30 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
 
-    var nextPathLength: Int = 2
+    val results: ListBuffer[(Int, Long)] = ListBuffer[(Int, Long)]()
+    results += (1, shortestPathsOfLengthOne.count())
+    var pathLength: Int = 2
+    results += (pathLength, subtractedAndDistinct.count())
     var generatedNewPaths: Boolean = true
+    var count: Long = 0
     while (generatedNewPaths) {
-      nextPathLength += 1
-      val currentCount: Long = subtractedAndDistinct.count()
+      pathLength += 1
+      val previousCount: Long = subtractedAndDistinct.count()
 
-      subtractedAndDistinct = generateNextShortestPaths(nextPathLength, subtractedAndDistinct, adjacencyMap)
+      subtractedAndDistinct = generateNextShortestPaths(pathLength, subtractedAndDistinct, adjacencyMap)
         .subtractByKey(subtractedAndDistinct)
         .union(subtractedAndDistinct)
         .sortByKey(ascending = true)
         .reduceByKey((a: Array[Int], b: Array[Int]) => a)
 
-      val afterCount: Long = subtractedAndDistinct.count()
-      generatedNewPaths = if (currentCount == afterCount) false else true
+      count = subtractedAndDistinct.count()
+      generatedNewPaths = if (previousCount == count) false else true
+      results += (pathLength, count)
     }
 
-    println(s"Stopped at $nextPathLength path length")
-
+    println(s"Stopped at $pathLength path length")
     collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
-
-    bidirectionalEdgesDF
+    results.toList
   }
 
   def generateNextShortestPaths(nextPathLength: Int, currentShortestPaths: RDD[(String, Array[Int])],
