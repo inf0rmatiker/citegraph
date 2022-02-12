@@ -292,6 +292,11 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       nextPathLength += 1
       val currentCount: Long = subtractedAndDistinct.count()
       subtractedAndDistinct = generateNextShortestPaths(nextPathLength, subtractedAndDistinct, adjacencyMap)
+        .subtractByKey(shortestPathsOfLengthOne)
+        .union(shortestPathsOfLengthOne)
+        .sortByKey(ascending = true)
+        .reduceByKey((a: Array[Int], b: Array[Int]) => a)
+
       val afterCount: Long = subtractedAndDistinct.count()
       generatedNewPaths = if (currentCount == afterCount) false else true
     }
