@@ -202,9 +202,10 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .drop("fromYear", "toYear")
 
     val shortestPathsOfLengthOne: RDD[(String, Array[Int])] = filteredByYearDF.map(row => {
-      val from: Int = row.getInt(0)
-      val to: Int = row.getInt(1)
+      var from: Int = row.getInt(0)
+      var to: Int = row.getInt(1)
       val key: String = "%d~%d".format(from, to)
+      if (to < from) { val temp = from; from = to; to = temp; }
       val value: Array[Int] = Array(from, to)
       (key, value)
     }).rdd
@@ -273,7 +274,11 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
 
-    val subtracted: RDD[(String, Array[Int])] = shortestPathsOfLengthOne.subtractByKey(pathsOfLengthTwo)
+    val subtracted: RDD[(String, Array[Int])] = pathsOfLengthTwo
+      .subtractByKey(shortestPathsOfLengthOne)
+      .union(shortestPathsOfLengthOne)
+      .sortByKey(ascending = true)
+
     collectAndPrintPairRDD(subtracted, "subtracted")
 
     bidirectionalEdgesDF
