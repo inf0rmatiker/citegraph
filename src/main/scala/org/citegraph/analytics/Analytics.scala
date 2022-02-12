@@ -205,7 +205,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       var from: Int = row.getInt(0)
       var to: Int = row.getInt(1)
       val key: String = "%d~%d".format(from, to)
-      if (to < from) { val temp = from; from = to; to = temp; }
+      if (to < from) { val temp = from; from = to; to = temp; } // Swap if to < from
       val value: Array[Int] = Array(from, to)
       (key, value)
     }).rdd
