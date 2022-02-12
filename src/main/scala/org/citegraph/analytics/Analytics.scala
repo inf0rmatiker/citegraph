@@ -297,7 +297,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         .union(subtractedAndDistinct)
         .sortByKey(ascending = true)
         .reduceByKey((a: Array[Int], b: Array[Int]) => a)
-      //subtractedAndDistinct = newSubtractedAndDistinct
+
       val afterCount: Long = subtractedAndDistinct.count()
       generatedNewPaths = if (currentCount == afterCount) false else true
     }

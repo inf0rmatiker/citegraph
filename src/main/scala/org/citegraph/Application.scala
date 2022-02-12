@@ -71,7 +71,7 @@ object Application {
     // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
     //val densities: DataFrame = analytics.findDensitiesByYear()
-    analytics.findGraphDiameterByYear(edgeCount = 0, year = 1995)
+    analytics.findGraphDiameterByYear(edgeCount = 0, year = 1998)
     // Save DataFrames as .csv files to HDFS output directory
     //val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
     //dataframeSaver.saveSortedAsCsv(filename = "densities.csv", densities, sortByCol = "year")
