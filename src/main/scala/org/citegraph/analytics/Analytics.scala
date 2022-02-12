@@ -145,7 +145,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     Question 2 Functions: TODO: Remove this banner. This is just to temporarily help organize
    --------------------------------------------------------------------------------------------*/
 
-  def findGraphDiameterByYear(year: Int): List[(Int, Long)] = {
+  def findGraphDiameterByYear(year: Int, debug: Boolean = false): List[(Int, Long, Double)] = {
 
     import sparkSession.implicits._
 
@@ -214,7 +214,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       (key, value)
     }).rdd
 
-    collectAndPrintPairRDD(shortestPathsOfLengthOne, "shortestPathsOfLengthOne")
+    if (debug) collectAndPrintPairRDD(shortestPathsOfLengthOne, "shortestPathsOfLengthOne")
 
     /*
      Creates an id -> [adjacency list] mapping for nodes 1 edge away.
@@ -269,7 +269,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       (endpoints, path)
     })
 
-    collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
+    if (debug) collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
 
     var subtractedAndDistinct: RDD[(String, Array[Int])] = pathsOfLengthTwo
       .subtractByKey(shortestPathsOfLengthOne)
@@ -277,12 +277,22 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .sortByKey(ascending = true)
       .reduceByKey((a: Array[Int], b: Array[Int]) => a)
 
-    collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
+    if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
 
-    val results: ListBuffer[(Int, Long)] = ListBuffer[(Int, Long)]()
-    results += ((1, shortestPathsOfLengthOne.count()))
+    val results: ListBuffer[(Int, Long, Double)] = ListBuffer[(Int, Long, Double)]()
+
+    // Add on length 1
+    val lengthOneCount: Long = shortestPathsOfLengthOne.count()
+    val lengthOnePercent: Double = (lengthOneCount * 1.0) / (totalPossiblePairsForYear * 1.0)
+    results += ((1, lengthOneCount, lengthOnePercent))
+
+    // Add on length 2
+    val lengthTwoCount: Long = subtractedAndDistinct.count()
+    val lengthTwoPercent: Double = (lengthTwoCount * 1.0) / (totalPossiblePairsForYear * 1.0)
+    results += ((2, lengthTwoCount, lengthTwoPercent))
+
+    // Length 3 and up
     var pathLength: Int = 2
-    results += ((pathLength, subtractedAndDistinct.count()))
     var generatedNewPaths: Boolean = true
     var count: Long = 0
 
@@ -297,12 +307,13 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         .reduceByKey((a: Array[Int], b: Array[Int]) => a)
 
       count = subtractedAndDistinct.count()
+      val countPercentage: Double = (count * 1.0) / (totalPossiblePairsForYear * 1.0)
       generatedNewPaths = if (previousCount == count) false else true
-      results += ((pathLength, count))
+      results += ((pathLength, count, countPercentage))
     }
 
     println(s"Stopped at $pathLength path length")
-    collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
+    if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
     results.toList
   }
 

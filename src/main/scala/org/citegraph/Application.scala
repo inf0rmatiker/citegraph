@@ -31,12 +31,14 @@ object Application {
 
     var inputDirectory: String = ""
     var outputDirectory: String = ""
+    var isTestingEnv: Boolean = false
 
     // Parse input args
     if (args.length < 2 || args.length > 3) {
       printUsage()
       System.exit(1)
     } else if (args.length == 3 && args(0) == "--testing") {
+      isTestingEnv = true
       printf("Running in local testing mode")
       inputDirectory = args(1)
       outputDirectory = args(2)
@@ -71,12 +73,16 @@ object Application {
     // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
     //val densities: DataFrame = analytics.findDensitiesByYear()
-    val tableByYear: List[(Int, Long)] = analytics.findGraphDiameterByYear(year = 1998)
+    val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(year = 1998, debug = isTestingEnv)
     print("tableByYear:\n")
     tableByYear.foreach{println}
+
+    val resultsRDD = sparkSession.sparkContext.parallelize(tableByYear)
+    val resultsDF = sparkSession.createDataFrame(resultsRDD).toDF("d", "g(d)", "percent_of_total")
+
     // Save DataFrames as .csv files to HDFS output directory
-    //val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
-    //dataframeSaver.saveSortedAsCsv(filename = "densities.csv", densities, sortByCol = "year")
+    val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
+    dataframeSaver.saveSortedAsCsv(filename = "diameter_1998.csv", resultsDF, sortByCol = "d")
 
     sparkSession.close()
   }
