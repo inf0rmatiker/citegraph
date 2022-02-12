@@ -246,37 +246,37 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         a ::: b  // Merge all the Lists sharing the same "from" key ( ":::" is a Scala List merge operator )
       }).toDF("id", "neighbors")  // Convert back to DataFrame with new column titles
 
-    val pathsOfLengthTwo: RDD[(String, Array[Int])] = adjacencyListDF.flatMap(row => {
-      val id: Int = row.getInt(0)
-      val neighbors: List[Int] = row.getAs[List[Int]](1)
-      val edges: ListBuffer[String] = ListBuffer[String]()
-      if (neighbors.length > 1) {
-        for (i: Int <- 0 to (neighbors.length-2)) {
-          for (j: Int <- (i + 1).until(neighbors.length)) {
-            var start: Int = neighbors(i)
-            var end: Int = neighbors(j)
+//    val pathsOfLengthTwo: RDD[(String, Array[Int])] = adjacencyListDF.flatMap(row => {
+//      val id: Int = row.getInt(0)
+//      val neighbors: List[Int] = row.getAs[List[Int]](1)
+//      val edges: ListBuffer[String] = ListBuffer[String]()
+//      if (neighbors.length > 1) {
+//        for (i: Int <- 0 to (neighbors.length-2)) {
+//          for (j: Int <- (i + 1).until(neighbors.length)) {
+//            var start: Int = neighbors(i)
+//            var end: Int = neighbors(j)
+//
+//            // Swap if end < start
+//            if (end < start) { val temp = end; end = start; start = temp }
+//            edges += s"$start~$end:$start,$id,$end"
+//          }
+//        }
+//      }
+//      edges.toList
+//    })
+//    .map(encodedString => {
+//      val parts: Array[String] = encodedString.split(":")
+//      val endpoints: String = parts(0)
+//      val path: Array[Int] = parts(1).split(",").map(_.toInt)
+//      (endpoints, path)
+//    }).rdd
 
-            // Swap if end < start
-            if (end < start) { val temp = end; end = start; start = temp }
-            edges += s"$start~$end:$start,$id,$end"
-          }
-        }
-      }
-      edges.toList
-    })
-    .map(encodedString => {
-      val parts: Array[String] = encodedString.split(":")
-      val endpoints: String = parts(0)
-      val path: Array[Int] = parts(1).split(",").map(_.toInt)
-      (endpoints, path)
-    }).rdd
+//    val collectedPathsOfLengthTwo: Array[(String, Array[Int])] = pathsOfLengthTwo.collect()
+//    print(collectedPathsOfLengthTwo.mkString("Array(",",",")"))
 
-    val collectedPathsOfLengthTwo: Array[(String, Array[Int])] = pathsOfLengthTwo.collect()
-    print(collectedPathsOfLengthTwo.mkString("Array(",",",")"))
-
-    val subtracted: RDD[(String, Array[Int])] = shortestPathsOfLengthOne.subtractByKey(pathsOfLengthTwo)
-    val collectedSubtracted: Array[(String, Array[Int])] = subtracted.collect()
-    print(collectedSubtracted.mkString("Array(",",",")"))
+//    val subtracted: RDD[(String, Array[Int])] = shortestPathsOfLengthOne.subtractByKey(pathsOfLengthTwo)
+//    val collectedSubtracted: Array[(String, Array[Int])] = subtracted.collect()
+//    print(collectedSubtracted.mkString("Array(",",",")"))
 
     bidirectionalEdgesDF
   }
