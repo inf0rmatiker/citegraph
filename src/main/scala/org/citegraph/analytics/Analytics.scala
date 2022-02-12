@@ -149,6 +149,9 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     import sparkSession.implicits._
 
+    val nodeCount: Long = publishedDatesDF.filter($"year" <= year).count()
+    val totalPossiblePairsForYear: Long = (nodeCount * (nodeCount - 1)) / 2
+
     /*
     Create bi-directional edges for the citationsDF:
       +-------+-------+       +-------+-------+
@@ -282,7 +285,8 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     results += ((pathLength, subtractedAndDistinct.count()))
     var generatedNewPaths: Boolean = true
     var count: Long = 0
-    while (generatedNewPaths) {
+
+    while (generatedNewPaths && (count < totalPossiblePairsForYear)) {
       pathLength += 1
       val previousCount: Long = subtractedAndDistinct.count()
 
