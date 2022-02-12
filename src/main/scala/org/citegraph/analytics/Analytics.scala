@@ -208,7 +208,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       val key: String = "%d~%d".format(from, to)
       val value: Array[Int] = Array(from, to)
       (key, value)
-    }).distinct().rdd
+    }).rdd
 
     // Collect to array of rows
 //    val shortestPathsOneArray: Array[Row] = shortestPathsOfLengthOne.collect()
@@ -274,12 +274,13 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
 
-    val subtracted: RDD[(String, Array[Int])] = pathsOfLengthTwo
+    val subtractedAndDistinct: RDD[(String, Array[Int])] = pathsOfLengthTwo
       .subtractByKey(shortestPathsOfLengthOne)
       .union(shortestPathsOfLengthOne)
       .sortByKey(ascending = true)
+      .reduceByKey((a: Array[Int], b: Array[Int]) => a)
 
-    collectAndPrintPairRDD(subtracted, "subtracted")
+    collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
 
     bidirectionalEdgesDF
   }
