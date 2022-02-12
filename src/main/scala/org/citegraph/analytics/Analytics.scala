@@ -5,7 +5,7 @@ import org.apache.spark.sql.functions.{col, sum}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
 import scala.collection.mutable
-import scala.collection.mutable.Map
+import scala.collection.mutable.{ListBuffer, Map}
 
 class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDatesDF: DataFrame) {
 
@@ -246,6 +246,26 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       }).rdd.reduceByKey((a: List[Int], b: List[Int]) => {  // Convert to rdd so we can use reduceByKey API
         a ::: b  // Merge all the Lists sharing the same "from" key ( ":::" is a Scala List merge operator )
       }).toDF("id", "neighbors")  // Convert back to DataFrame with new column titles
+
+    val x: DataFrame = adjacencyListDF.flatMap(row => {
+      val id: Int = row.getInt(0)
+      val neighbors: List[Int] = row.getAs[List[Int]](1)
+      val edges: ListBuffer[String] = ListBuffer[String]()
+      if (neighbors.length > 1) {
+        for (i: Int <- 0 to (neighbors.length-2)) {
+          for (j: Int <- (i + 1).until(neighbors.length)) {
+            var start: Int = neighbors(i)
+            var end: Int = neighbors(j)
+
+            // Swap if end < start
+            if (end < start) { val temp = end; end = start; start = temp }
+            edges +=  s"$start~$end:$start $id $end"
+          }
+        }
+      }
+
+      edges.toList
+    }).toDF()
 
 
     bidirectionalEdgesDF
