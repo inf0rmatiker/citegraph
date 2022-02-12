@@ -277,9 +277,9 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
 
     val results: ListBuffer[(Int, Long)] = ListBuffer[(Int, Long)]()
-    results += (1, shortestPathsOfLengthOne.count())
+    results += ((1, shortestPathsOfLengthOne.count()))
     var pathLength: Int = 2
-    results += (pathLength, subtractedAndDistinct.count())
+    results += ((pathLength, subtractedAndDistinct.count()))
     var generatedNewPaths: Boolean = true
     var count: Long = 0
     while (generatedNewPaths) {
@@ -294,7 +294,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
       count = subtractedAndDistinct.count()
       generatedNewPaths = if (previousCount == count) false else true
-      results += (pathLength, count)
+      results += ((pathLength, count))
     }
 
     println(s"Stopped at $pathLength path length")
