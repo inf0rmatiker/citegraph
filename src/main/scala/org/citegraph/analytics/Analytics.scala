@@ -219,8 +219,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 //      printf("%s -> %s\n", i._1, i._2)
 //    }
 
-    val collectedShortestPathsOfLengthOne: Array[(String, Array[Int])] = shortestPathsOfLengthOne.collect()
-    print(collectedShortestPathsOfLengthOne.mkString("Array(",",",")"))
+    collectAndPrintPairRDD(shortestPathsOfLengthOne, "shortestPathsOfLengthOne")
 
     /*
      Creates an id -> [adjacency list] mapping for nodes 1 edge away.
@@ -279,6 +278,17 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 //    print(collectedSubtracted.mkString("Array(",",",")"))
 
     bidirectionalEdgesDF
+  }
+
+  def collectAndPrintPairRDD(pairRDD: RDD[(String, Array[Int])], name: String): Unit = {
+    val collected: Array[(String, Array[Int])] = pairRDD.collect()
+    val sb: mutable.StringBuilder = mutable.StringBuilder.newBuilder
+    sb.append(s"PairRDD[(String, Array[Int])] $name:\n")
+    collected.foreach{ x =>
+      val arrayStr: String = x._2.mkString("Array(",",",")")
+      sb.append(s"\t(\"$name\", $arrayStr)\n")
+    }
+    println(sb.toString())
   }
 
 }
