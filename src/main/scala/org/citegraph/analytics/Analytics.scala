@@ -278,7 +278,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
 
-    val subtractedAndDistinct: RDD[(String, Array[Int])] = pathsOfLengthTwo
+    var subtractedAndDistinct: RDD[(String, Array[Int])] = pathsOfLengthTwo
       .subtractByKey(shortestPathsOfLengthOne)
       .union(shortestPathsOfLengthOne)
       .sortByKey(ascending = true)
@@ -286,9 +286,26 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
 
-    val pathsOfLengthThree: RDD[(String, Array[Int])] = subtractedAndDistinct
-      .filter(row => row._2.length == 3)
-      .flatMap{
+    var nextPathLength: Int = 2
+    var generatedNewPaths: Boolean = true
+    while (generatedNewPaths) {
+      nextPathLength += 1
+      val currentCount: Long = subtractedAndDistinct.count()
+      subtractedAndDistinct = generateNextShortestPaths(nextPathLength, subtractedAndDistinct, adjacencyMap)
+      val afterCount: Long = subtractedAndDistinct.count()
+      generatedNewPaths = if (currentCount == afterCount) false else true
+    }
+
+    println(s"Stopped at $nextPathLength path length")
+
+    collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
+
+    bidirectionalEdgesDF
+  }
+
+  def generateNextShortestPaths(nextPathLength: Int, currentShortestPaths: RDD[(String, Array[Int])],
+                                adjacencyMap: Map[Int, Array[Int]]): RDD[(String, Array[Int])] = {
+    currentShortestPaths.filter(row => row._2.length == nextPathLength).flatMap{
         case(endpoints: String, path: Array[Int]) =>
           var edges: ListBuffer[String] = ListBuffer()
           val firstElement: Int = path(0)
@@ -305,15 +322,11 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
           }
           edges.toList
       }.map(encodedString => {
-        val parts: Array[String] = encodedString.split(":")
-        val endpoints: String = parts(0)
-        val path: Array[Int] = parts(1).split(",").map(_.toInt)
-        (endpoints, path)
-      })
-
-    collectAndPrintPairRDD(pathsOfLengthThree, "pathsOfLengthThree")
-
-    bidirectionalEdgesDF
+      val parts: Array[String] = encodedString.split(":")
+      val endpoints: String = parts(0)
+      val path: Array[Int] = parts(1).split(",").map(_.toInt)
+      (endpoints, path)
+    })
   }
 
   def collectAndPrintPairRDD(pairRDD: RDD[(String, Array[Int])], name: String): Unit = {
