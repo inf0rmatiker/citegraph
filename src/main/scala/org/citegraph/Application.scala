@@ -18,7 +18,7 @@ object Application {
     println("USAGE")
     println("\tBuild:\n\t\tsbt package")
     println("\tSubmit as JAR to Spark cluster:\n\t\t$SPARK_HOME/bin/spark-submit <submit_options> \\")
-    println("\t\ttarget/scala-2.13/citegraph_2.13-0.1.jar <hdfs_input_dir> <hdfs_output_dir>")
+    println("\t\ttarget/scala-2.13/citegraph_2.13-0.1.jar [--testing] <input_dir> <output_dir>")
     println()
   }
 
@@ -28,23 +28,31 @@ object Application {
 
   def main(args: Array[String]): Unit = {
     printArgs(args)
-    if (args.length != 2) {
+
+    var inputDirectory: String = ""
+    var outputDirectory: String = ""
+
+    // Parse input args
+    if (args.length < 2 || args.length > 3) {
       printUsage()
       System.exit(1)
+    } else if (args.length == 3 && args(0) == "--testing") {
+      printf("Running in local testing mode")
+      inputDirectory = args(1)
+      outputDirectory = args(2)
+    } else if (args.length == 2) {
+      inputDirectory = args(0)
+      outputDirectory = args(1)
+      if (!isValidHdfsUri(inputDirectory)) {
+        printf("Invalid HDFS input directory: %s\n", inputDirectory)
+        System.exit(1)
+      } else if (!isValidHdfsUri(outputDirectory)) {
+        printf("Invalid HDFS output directory: %s\n", outputDirectory)
+        System.exit(1)
+      }
     }
 
-    // Validate and fix inputDirectory
-    var inputDirectory: String = args(0)
-    val outputDirectory: String = args(1)
-
-    if (!isValidHdfsUri(inputDirectory)) {
-      printf("Invalid HDFS input directory: %s\n", inputDirectory)
-      System.exit(1)
-    } else if (!isValidHdfsUri(outputDirectory)) {
-      printf("Invalid HDFS output directory: %s\n", outputDirectory)
-      System.exit(1)
-    }
-
+    // Fix input directory
     if (inputDirectory.endsWith("/")) { // Chop off trailing slash
       inputDirectory = inputDirectory.substring(0, inputDirectory.length - 1)
     }
@@ -62,11 +70,11 @@ object Application {
 
     // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
-    val densities: DataFrame = analytics.findDensitiesByYear()
-
+    //val densities: DataFrame = analytics.findDensitiesByYear()
+    analytics.findGraphDiameterByYear(edgeCount = 0, year = 1995)
     // Save DataFrames as .csv files to HDFS output directory
-    val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
-    dataframeSaver.saveSortedAsCsv(filename = "densities.csv", densities, sortByCol = "year")
+    //val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
+    //dataframeSaver.saveSortedAsCsv(filename = "densities.csv", densities, sortByCol = "year")
 
     sparkSession.close()
   }
