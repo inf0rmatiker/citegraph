@@ -238,16 +238,18 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       |    ...|                 ...|
       +-------+--------------------+
      */
-    val adjacencyListDF: DataFrame = filteredByYearDF.drop("fromYear", "toYear")  // Drop the year cols from above
+    val adjacencyList: RDD[(Int, Array[Int])] = filteredByYearDF.drop("fromYear", "toYear")  // Drop the year cols from above
       .map(row => {  // Convert all the "to" values to a Scala List containing the "to" value
         (row.getInt(0), List(row.getInt(1)))
       }).rdd.reduceByKey((a: List[Int], b: List[Int]) => {  // Convert to rdd so we can use reduceByKey API
         a ::: b  // Merge all the Lists sharing the same "from" key ( ":::" is a Scala List merge operator )
-      }).toDF("id", "neighbors")  // Convert back to DataFrame with new column titles
+      }).map(row => {
+      (row._1, row._2.toArray)
+    })
 
-    val pathsOfLengthTwo: Dataset[String] = adjacencyListDF.flatMap(row => {
-      val id: Int = row.getInt(0)
-      val neighbors: List[Int] = row.getAs[List[Int]](1)
+    val pathsOfLengthTwo: RDD[(String, Array[Int])] = adjacencyList.flatMap(row => {
+      val id: Int = row._1
+      val neighbors: Array[Int] = row._2
       val edges: ListBuffer[String] = ListBuffer[String]()
       if (neighbors.length > 1) {
         for (i: Int <- 0 to (neighbors.length-2)) {
@@ -262,17 +264,17 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         }
       }
       edges.toList
+    }).map(encodedString => {
+      val parts: Array[String] = encodedString.split(":")
+      val endpoints: String = parts(0)
+      val path: Array[Int] = parts(1).split(",").map(_.toInt)
+      (endpoints, path)
     })
 
-    pathsOfLengthTwo.show()
-//      .map(encodedString => {
-//      val parts: Array[String] = encodedString.split(":")
-//      val endpoints: String = parts(0)
-//      val path: Array[Int] = parts(1).split(",").map(_.toInt)
-//      (endpoints, path)
-//    }).rdd
+    collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
 
-    //collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
+
+    //
 
 //    val collectedPathsOfLengthTwo: Array[(String, Array[Int])] = pathsOfLengthTwo.collect()
 //    print(collectedPathsOfLengthTwo.mkString("Array(",",",")"))
