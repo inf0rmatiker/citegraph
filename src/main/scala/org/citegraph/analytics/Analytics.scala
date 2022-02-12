@@ -245,7 +245,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         a ::: b  // Merge all the Lists sharing the same "from" key ( ":::" is a Scala List merge operator )
       }).toDF("id", "neighbors")  // Convert back to DataFrame with new column titles
 
-    val pathsOfLengthTwo: RDD[(String, Array[Int])] = adjacencyListDF.flatMap(row => {
+    val pathsOfLengthTwo: Dataset[String] = adjacencyListDF.flatMap(row => {
       val id: Int = row.getInt(0)
       val neighbors: List[Int] = row.getAs[List[Int]](1)
       val edges: ListBuffer[String] = ListBuffer[String]()
@@ -263,14 +263,16 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       }
       edges.toList
     })
-    .map(encodedString => {
-      val parts: Array[String] = encodedString.split(":")
-      val endpoints: String = parts(0)
-      val path: Array[Int] = parts(1).split(",").map(_.toInt)
-      (endpoints, path)
-    }).rdd
 
-    collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
+    pathsOfLengthTwo.show()
+//      .map(encodedString => {
+//      val parts: Array[String] = encodedString.split(":")
+//      val endpoints: String = parts(0)
+//      val path: Array[Int] = parts(1).split(",").map(_.toInt)
+//      (endpoints, path)
+//    }).rdd
+
+    //collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
 
 //    val collectedPathsOfLengthTwo: Array[(String, Array[Int])] = pathsOfLengthTwo.collect()
 //    print(collectedPathsOfLengthTwo.mkString("Array(",",",")"))
