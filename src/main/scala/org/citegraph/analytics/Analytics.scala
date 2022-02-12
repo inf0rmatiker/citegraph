@@ -300,7 +300,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
               // Swap if end < start
               if (end < start) { val temp = end; end = start; start = temp }
-              edges += "%d~%d:%d,%s".format(start, end, start, path.mkString(","))
+              edges += "%d~%d:%d,%s".format(start, end, neighbor, path.mkString(","))
             }
           }
           edges.toList
