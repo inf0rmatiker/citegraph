@@ -1,5 +1,6 @@
 package org.citegraph.analytics
 
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, sum}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
@@ -200,28 +201,26 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .filter($"toYear" <= year)
       .drop("fromYear", "toYear")
 
-    val shortestPathsOfLengthOne: DataFrame = filteredByYearDF.map(row => {
+    val shortestPathsOfLengthOne: RDD[(String, Array[Int])] = filteredByYearDF.map(row => {
       val from: Int = row.getInt(0)
       val to: Int = row.getInt(1)
       val key: String = "%d~%d".format(from, to)
       val value: Array[Int] = Array(from, to)
       (key, value)
-    }).toDF("endpoints", "path")
+    }).rdd
 
     // Collect to array of rows
-    val shortestPathsOneArray: Array[Row] = shortestPathsOfLengthOne.collect()
-    val shortestPathsMap: mutable.Map[String, Array[Int]] = mutable.Map()
-    for (row: Row <- shortestPathsOneArray)
-      shortestPathsMap += (row.getString(0) -> row.getAs[Array[Int]](1))
+//    val shortestPathsOneArray: Array[Row] = shortestPathsOfLengthOne.collect()
+//    val shortestPathsMap: mutable.Map[String, Array[Int]] = mutable.Map()
+//    for (row: Row <- shortestPathsOneArray)
+//      shortestPathsMap += (row.getString(0) -> row.getAs[Array[Int]](1))
+//
+//    shortestPathsMap.foreach{ i =>
+//      printf("%s -> %s\n", i._1, i._2)
+//    }
 
-    shortestPathsMap.foreach{ i =>
-      printf("%s -> %s\n", i._1, i._2)
-    }
-
-
-
-
-    shortestPathsOfLengthOne.show()
+    val collectedShortestPathsOfLengthOne: Array[(String, Array[Int])] = shortestPathsOfLengthOne.collect()
+    print(collectedShortestPathsOfLengthOne.mkString("Array(",",",")"))
 
     /*
      Creates an id -> [adjacency list] mapping for nodes 1 edge away.
@@ -247,7 +246,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         a ::: b  // Merge all the Lists sharing the same "from" key ( ":::" is a Scala List merge operator )
       }).toDF("id", "neighbors")  // Convert back to DataFrame with new column titles
 
-    val x: DataFrame = adjacencyListDF.flatMap(row => {
+    val pathsOfLengthTwo: RDD[(String, Array[Int])] = adjacencyListDF.flatMap(row => {
       val id: Int = row.getInt(0)
       val neighbors: List[Int] = row.getAs[List[Int]](1)
       val edges: ListBuffer[String] = ListBuffer[String]()
@@ -259,14 +258,25 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
             // Swap if end < start
             if (end < start) { val temp = end; end = start; start = temp }
-            edges +=  s"$start~$end:$start $id $end"
+            edges += s"$start~$end:$start,$id,$end"
           }
         }
       }
-
       edges.toList
-    }).toDF()
+    })
+    .map(encodedString => {
+      val parts: Array[String] = encodedString.split(":")
+      val endpoints: String = parts(0)
+      val path: Array[Int] = parts(1).split(",").map(_.toInt)
+      (endpoints, path)
+    }).rdd
 
+    val collectedPathsOfLengthTwo: Array[(String, Array[Int])] = pathsOfLengthTwo.collect()
+    print(collectedPathsOfLengthTwo.mkString("Array(",",",")"))
+
+    val subtracted: RDD[(String, Array[Int])] = shortestPathsOfLengthOne.subtractByKey(pathsOfLengthTwo)
+    val collectedSubtracted: Array[(String, Array[Int])] = subtracted.collect()
+    print(collectedSubtracted.mkString("Array(",",",")"))
 
     bidirectionalEdgesDF
   }
