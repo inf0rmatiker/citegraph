@@ -5,8 +5,9 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, sum}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
+import scala.collection.Map
 import scala.collection.mutable
-import scala.collection.mutable.{ListBuffer, Map}
+import scala.collection.mutable.ListBuffer
 
 class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDatesDF: DataFrame) {
 
@@ -248,6 +249,8 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       (row._1, row._2.toArray)
     })
 
+    val adjacencyMap: Map[Int, Array[Int]] = adjacencyList.collectAsMap()
+
     val pathsOfLengthTwo: RDD[(String, Array[Int])] = adjacencyList.flatMap(row => {
       val id: Int = row._1
       val neighbors: Array[Int] = row._2
@@ -281,6 +284,33 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .reduceByKey((a: Array[Int], b: Array[Int]) => a)
 
     collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
+
+    val pathsOfLengthThree: RDD[(String, Array[Int])] = subtractedAndDistinct
+      .filter(row => row._2.length == 3)
+      .flatMap{
+        case(endpoints: String, path: Array[Int]) =>
+          var edges: ListBuffer[String] = ListBuffer()
+          val firstElement: Int = path(0)
+          val adjacencyList: Array[Int] = adjacencyMap(firstElement)
+          for (neighbor: Int <- adjacencyList) {
+            if (!path.contains(neighbor)) {
+              var start: Int = neighbor
+              var end: Int = path(path.length-1)
+
+              // Swap if end < start
+              if (end < start) { val temp = end; end = start; start = temp }
+              edges += "%d~%d:%d,%s".format(start, end, start, path.mkString(","))
+            }
+          }
+          edges.toList
+      }.map(encodedString => {
+        val parts: Array[String] = encodedString.split(":")
+        val endpoints: String = parts(0)
+        val path: Array[Int] = parts(1).split(",").map(_.toInt)
+        (endpoints, path)
+      })
+
+    collectAndPrintPairRDD(pathsOfLengthThree, "pathsOfLengthThree")
 
     bidirectionalEdgesDF
   }
