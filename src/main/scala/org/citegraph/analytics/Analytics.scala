@@ -208,7 +208,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       val key: String = "%d~%d".format(from, to)
       val value: Array[Int] = Array(from, to)
       (key, value)
-    }).rdd
+    }).distinct().rdd
 
     // Collect to array of rows
 //    val shortestPathsOneArray: Array[Row] = shortestPathsOfLengthOne.collect()
