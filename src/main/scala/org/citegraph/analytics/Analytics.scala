@@ -275,8 +275,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .union(shortestPathsOfLengthOne)
       .sortByKey(ascending = true)
 
-    subtractedAndDistinct = subtractedAndDistinct.toDF("endpoints", "path")
-      .dropDuplicates("endpoints").rdd.map(row => (row.getString(0), row.getAs[Array[Int]](1)))
+    subtractedAndDistinct.toDF("endpoints", "path").dropDuplicates("endpoints").printSchema()
 
     if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
 
