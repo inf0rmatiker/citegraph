@@ -324,17 +324,36 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         case(endpoints: String, path: Array[Int]) =>
           var edges: ListBuffer[String] = ListBuffer()
           val firstElement: Int = path(0)
-          val adjacencyList: Array[Int] = adjacencyMap(firstElement)
-          for (neighbor: Int <- adjacencyList) {
+          val lastElement: Int = path(path.length-1)
+          val firstElementNeighbors: Array[Int] = adjacencyMap(firstElement)
+          val lastElementNeighbors: Array[Int] = adjacencyMap(lastElement)
+
+          // Iterate over neighbors of first element and see if there's any not already in the path
+          // If there are, prepend it to the path.
+          for (neighbor: Int <- firstElementNeighbors) {
             if (!path.contains(neighbor)) {
               var start: Int = neighbor
-              var end: Int = path(path.length-1)
+              var end: Int = lastElement
 
               // Swap if end < start
               if (end < start) { val temp = end; end = start; start = temp }
               edges += "%d~%d:%d,%s".format(start, end, neighbor, path.mkString(","))
             }
           }
+
+          // Iterate over neighbors of last element and see if there's any not already in the path.
+          // If there are, append it to the path.
+          for (neighbor: Int <- lastElementNeighbors) {
+            if (!path.contains(neighbor)) {
+              var start: Int = firstElement
+              var end: Int = neighbor
+
+              // Swap if end < start
+              if (end < start) { val temp = end; end = start; start = temp }
+              edges += "%d~%d:%s,%d".format(start, end, path.mkString(","), neighbor)
+            }
+          }
+
           edges.toList
       }.map(encodedString => {
         val parts: Array[String] = encodedString.split(":")
