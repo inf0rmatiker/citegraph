@@ -251,7 +251,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       ((9, 11), [9, 8, 11])  --> (9,  [11, 8, 9])
                              --> (11, [9, 8, 11])
      */
-    val combinationTwo: RDD[(Int, Array[Int])] = pathsOfLengthTwo.flatMap( row => {
+    val pathsToLengthTwo: RDD[(Int, Array[Int])] = pathsOfLengthTwo.flatMap( row => {
       val path: Array[Int] = row._2
       val start: Int = path(0); val end: Int = path(path.length-1)
       // val originalPathString: String = "%d:%s".format(start, path.mkString(","))
@@ -262,34 +262,82 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       //val backwardsPathString: String = "%d:%s".format(end, backwardsPath.mkString(","))
       List((start, backwardsPath), (end, path))
     })
-    if (debug) collectAndPrintMapRDD(combinationTwo, "combinationTwo")
+    if (debug) collectAndPrintMapRDD(pathsToLengthTwo, "pathsToLengthTwo")
 
     /*
       ((4, 9), [4, 9])  --> (4, [4, 9])
       ((9, 4), [9, 4])  --> (9, [9, 4])
      */
-    val combinationOne: RDD[(Int, Array[Int])] = bidirectionalPathsOfLengthOne.map(row => (row._1._1, row._2))
-    if (debug) collectAndPrintMapRDD(combinationOne, "combinationOne")
+    val pathsFromLengthOne: RDD[(Int, Array[Int])] = bidirectionalPathsOfLengthOne.map(row => (row._1._1, row._2))
+    if (debug) collectAndPrintMapRDD(pathsFromLengthOne, "pathsFromLengthOne")
 
-    val combinationThree: RDD[((Int, Int), Array[Int])] = combinationTwo.join(combinationOne).map(row => {
-      val pivot: Int = row._1 // The point that we are joining the 2-path and 1-path on
-      val toPath: Array[Int] = row._2._1 // The path that leads to the pivot point
-      val fromPath: Array[Int] = row._2._2 // The path that leads away from the pivot point
-      // Allocate array big enough for both paths, minus the duplicate pivot point
+    val combinationThree: RDD[((Int, Int), Array[Int])] = pathsToLengthTwo.join(pathsFromLengthOne)
+      .map(row => {
+        val pivot: Int = row._1 // The point that we are joining the 2-path and 1-path on
+        val toPath: Array[Int] = row._2._1 // The path that leads to the pivot point
+        val fromPath: Array[Int] = row._2._2 // The path that leads away from the pivot point
+        // Allocate array big enough for both paths, minus the duplicate pivot point
 
-      val fullPath: Array[Int] = new Array[Int](toPath.length + fromPath.length - 1)
-      for (i <- toPath.indices) {
-        fullPath(i) = toPath(i)
-      }
+        val fullPath: Array[Int] = new Array[Int](toPath.length + fromPath.length - 1)
+        for (i <- toPath.indices) {
+          fullPath(i) = toPath(i)
+        }
 
-      for (i <- 1 until fromPath.length) {
-        fullPath(toPath.length + (i-1)) = fromPath(i)
-      }
-      val start: Int = fullPath(0); val end: Int = fullPath(fullPath.length-1)
-      ((start, end), fullPath)
+        for (i <- 1 until fromPath.length) {
+          fullPath(toPath.length + (i-1)) = fromPath(i)
+        }
+        val start: Int = fullPath(0); val end: Int = fullPath(fullPath.length-1)
+        ((start, end), fullPath)
     })
     if (debug) collectAndPrintPairRDD(combinationThree, "combinationThree")
 
+
+    val pathsOfLengthThree: RDD[((Int, Int), Array[Int])] = pathsOfLengthTwo.flatMap{
+      case((start: Int, end: Int), path: Array[Int]) =>
+        val newRows: ListBuffer[((Int, Int), Array[Int])] = new ListBuffer[((Int, Int), Array[Int])]()
+        val firstElementNeighbors: Array[Int] = adjacencyMap(start)
+        val lastElementNeighbors: Array[Int] = adjacencyMap(end)
+
+        // Iterate over neighbors of first element and see if there's any not already in the path
+        // If there are, prepend it to the path.
+        for (neighbor: Int <- firstElementNeighbors) {
+          if (!path.contains(neighbor)) {
+            val newStart: Int = neighbor
+            val newEnd: Int = end
+
+            // Swap if end < start
+            val newKey: (Int, Int) = if (newEnd < newStart) (newEnd, newStart) else (newStart, newEnd)
+
+            // New array: [ <start_neighbor>, <original_path> ]
+            val newPath: Array[Int] = new Array[Int](path.length + 1)
+            newPath(0) = newStart
+            for (i <- path.indices) newPath(i+1) = path(i)
+            newRows += ((newKey, newPath))
+          }
+        }
+
+        // Iterate over neighbors of last element and see if there's any not already in the path.
+        // If there are, append it to the path.
+        for (neighbor: Int <- lastElementNeighbors) {
+          if (!path.contains(neighbor)) {
+            val newStart: Int = start
+            val newEnd: Int = neighbor
+
+            // Swap if end < start
+            val newKey: (Int, Int) = if (newEnd < newStart) (newEnd, newStart) else (newStart, newEnd)
+
+            // New array: [ <original_path>, <end_neighbor> ]
+            val newPath: Array[Int] = new Array[Int](path.length + 1)
+            for (i <- path.indices) newPath(i) = path(i)
+            newPath(newPath.length-1) = newEnd
+            newRows += ((newKey, newPath))
+          }
+        }
+        newRows.toList
+    }.reduceByKey((a: Array[Int], _: Array[Int]) => a)
+      .sortByKey(ascending = true)
+
+    if (debug) collectAndPrintPairRDD(pathsOfLengthThree, "pathsOfLengthThree")
 
     /*var subtractedAndDistinct: RDD[(String, Array[Int])] = pathsOfLengthTwo
       .subtractByKey(shortestPathsOfLengthOne)
