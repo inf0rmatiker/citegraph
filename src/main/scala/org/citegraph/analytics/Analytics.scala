@@ -218,12 +218,15 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     collectAndPrintMapRDD(adjacencyList, "adjacencyMap")
     val adjacencyMap: Map[Int, Array[Int]] = adjacencyList.collectAsMap()
 
-    val bidirectionalPathsOfLengthOne: RDD[((Int, Int), Array[Int])] = bidirectionalFilteredByYear.map(row => {
-      ((row._1, row._2), Array(row._1, row._2))
-    }).sortByKey(ascending = true)
+    val pathsOfLengthOne: RDD[((Int, Int), Array[Int])] = bidirectionalFilteredByYear.map(row => {
+      val start: Int = row._1; val end: Int = row._2
+      val key: (Int, Int) = if (end < start) (end, start) else (start, end)
+      val path: Array[Int] = Array(start, end)
+      (key, path)
+    }).reduceByKey((a: Array[Int], _: Array[Int]) => a)
+      .sortByKey(ascending = true)
 
-    if (debug) collectAndPrintPairRDD(bidirectionalPathsOfLengthOne, "bidirectionalPathsOfLengthOne")
-
+    if (debug) collectAndPrintPairRDD(pathsOfLengthOne, "pathsOfLengthOne")
 
     val pathsOfLengthTwo: RDD[((Int, Int), Array[Int])] = adjacencyList.flatMap(row => {
       val id: Int = row._1
@@ -247,11 +250,17 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     if (debug) collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
 
+    var combinedShortestPaths = pathsOfLengthTwo.subtractByKey(pathsOfLengthOne)
+      .union(pathsOfLengthOne)
+      .sortByKey(ascending = true)
+
+    if (debug) collectAndPrintPairRDD(combinedShortestPaths, "combinedShortestPaths")
+
     /*
       ((9, 11), [9, 8, 11])  --> (9,  [11, 8, 9])
                              --> (11, [9, 8, 11])
      */
-    val pathsToLengthTwo: RDD[(Int, Array[Int])] = pathsOfLengthTwo.flatMap( row => {
+    /*val pathsToLengthTwo: RDD[(Int, Array[Int])] = pathsOfLengthTwo.flatMap( row => {
       val path: Array[Int] = row._2
       val start: Int = path(0); val end: Int = path(path.length-1)
       // val originalPathString: String = "%d:%s".format(start, path.mkString(","))
@@ -263,15 +272,15 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       List((start, backwardsPath), (end, path))
     })
     if (debug) collectAndPrintMapRDD(pathsToLengthTwo, "pathsToLengthTwo")
-
+*/
     /*
       ((4, 9), [4, 9])  --> (4, [4, 9])
       ((9, 4), [9, 4])  --> (9, [9, 4])
      */
-    val pathsFromLengthOne: RDD[(Int, Array[Int])] = bidirectionalPathsOfLengthOne.map(row => (row._1._1, row._2))
-    if (debug) collectAndPrintMapRDD(pathsFromLengthOne, "pathsFromLengthOne")
+    /*val pathsFromLengthOne: RDD[(Int, Array[Int])] = bidirectionalPathsOfLengthOne.map(row => (row._1._1, row._2))
+    if (debug) collectAndPrintMapRDD(pathsFromLengthOne, "pathsFromLengthOne")*/
 
-    val combinationThree: RDD[((Int, Int), Array[Int])] = pathsToLengthTwo.join(pathsFromLengthOne)
+    /*val combinationThree: RDD[((Int, Int), Array[Int])] = pathsToLengthTwo.join(pathsFromLengthOne)
       .map(row => {
         val pivot: Int = row._1 // The point that we are joining the 2-path and 1-path on
         val toPath: Array[Int] = row._2._1 // The path that leads to the pivot point
@@ -289,7 +298,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         val start: Int = fullPath(0); val end: Int = fullPath(fullPath.length-1)
         ((start, end), fullPath)
     })
-    if (debug) collectAndPrintPairRDD(combinationThree, "combinationThree")
+    if (debug) collectAndPrintPairRDD(combinationThree, "combinationThree")*/
 
 
     val pathsOfLengthThree: RDD[((Int, Int), Array[Int])] = pathsOfLengthTwo.flatMap{
@@ -338,6 +347,12 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .sortByKey(ascending = true)
 
     if (debug) collectAndPrintPairRDD(pathsOfLengthThree, "pathsOfLengthThree")
+
+    combinedShortestPaths = pathsOfLengthThree.subtractByKey(combinedShortestPaths)
+      .union(combinedShortestPaths)
+      .sortByKey(ascending = true)
+
+    if (debug) collectAndPrintPairRDD(combinedShortestPaths, "combinedShortestPaths")
 
     /*var subtractedAndDistinct: RDD[(String, Array[Int])] = pathsOfLengthTwo
       .subtractByKey(shortestPathsOfLengthOne)
