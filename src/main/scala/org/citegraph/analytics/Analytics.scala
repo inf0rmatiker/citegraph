@@ -305,13 +305,13 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       pathLength += 1
       val previousCount: Long = subtractedAndDistinct.count()
 
-      subtractedAndDistinct = generateNextShortestPaths(pathLength, subtractedAndDistinct, adjacencyMap)
+      val subtractedAndDistinctDF: DataFrame = generateNextShortestPaths(pathLength, subtractedAndDistinct, adjacencyMap)
         .subtractByKey(subtractedAndDistinct)
         .union(subtractedAndDistinct)
         .sortByKey(ascending = true)
+        .toDF("endpoints", "path")
 
-      subtractedAndDistinct = subtractedAndDistinct.toDS()
-        .dropDuplicates("endpoints").rdd
+      subtractedAndDistinctDF.dropDuplicates("endpoints").printSchema()
 
       //.map(row => (row.getString(0), row.getList(1).toArray()))
 
