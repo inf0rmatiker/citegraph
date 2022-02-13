@@ -310,8 +310,10 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         .union(subtractedAndDistinct)
         .sortByKey(ascending = true)
 
-      subtractedAndDistinct = subtractedAndDistinct.toDF("endpoints", "path")
-        .dropDuplicates("endpoints").rdd.map(row => (row.getString(0), row.getAs[Array[Int]](1)))
+      subtractedAndDistinct = subtractedAndDistinct.toDS()
+        .dropDuplicates("endpoints").rdd
+
+      //.map(row => (row.getString(0), row.getList(1).toArray()))
 
       count = subtractedAndDistinct.count()
       val countPercentage: Double = (count * 1.0) / (totalPairs * 1.0)
