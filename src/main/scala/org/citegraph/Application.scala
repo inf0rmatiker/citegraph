@@ -30,7 +30,7 @@ object Application {
     val bufferedSource = Source.fromFile(s"$directory/nodepairs.csv")
     for (line <- bufferedSource.getLines) {
       val cols: Array[String] = line.split(",").map(_.trim)
-      nodePairs += (cols(0).toInt, cols(1).toLong)
+      nodePairs += ((cols(0).toInt, cols(1).toLong))
     }
     bufferedSource.close
     nodePairs.toList
