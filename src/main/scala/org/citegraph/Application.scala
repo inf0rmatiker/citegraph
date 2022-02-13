@@ -5,6 +5,9 @@ import org.citegraph.analytics.Analytics
 import org.citegraph.loading.DataFrameLoader
 import org.citegraph.saving.DataFrameSaver
 
+import scala.collection.mutable.ListBuffer
+import scala.io.Source
+
 object Application {
 
   def printArgs(args: Array[String]): Unit = {
@@ -20,6 +23,17 @@ object Application {
     println("\tSubmit as JAR to Spark cluster:\n\t\t$SPARK_HOME/bin/spark-submit <submit_options> \\")
     println("\t\ttarget/scala-2.13/citegraph_2.13-0.1.jar [--testing] <input_dir> <output_dir>")
     println()
+  }
+
+  def loadTotalNodePairsFromCSV(directory: String = "hdfs://ant:30201/cs535/data"): List[(Int, Long)] = {
+    val nodePairs: ListBuffer[(Int, Long)] = ListBuffer[(Int, Long)]()
+    val bufferedSource = Source.fromFile(s"$directory/nodepairs.csv")
+    for (line <- bufferedSource.getLines) {
+      val cols: Array[String] = line.split(",").map(_.trim)
+      nodePairs += (cols(0).toInt, cols(1).toLong)
+    }
+    bufferedSource.close
+    nodePairs.toList
   }
 
   def isValidHdfsUri(uri: String): Boolean = {
@@ -73,7 +87,12 @@ object Application {
     // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
     //val densities: DataFrame = analytics.findDensitiesByYear()
-    val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(year = 1993, debug = isTestingEnv)
+    val nodePairs: List[(Int, Long)] = loadTotalNodePairsFromCSV()
+    val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(
+      year = nodePairs(1)._1,
+      totalPairs = nodePairs(1)._2,
+      debug = isTestingEnv
+    )
     print("tableByYear:\n")
     tableByYear.foreach{println}
 

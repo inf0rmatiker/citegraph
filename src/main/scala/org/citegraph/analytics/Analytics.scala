@@ -145,12 +145,11 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     Question 2 Functions: TODO: Remove this banner. This is just to temporarily help organize
    --------------------------------------------------------------------------------------------*/
 
-  def findGraphDiameterByYear(year: Int, debug: Boolean = false): List[(Int, Long, Double)] = {
+  def findGraphDiameterByYear(year: Int, totalPairs: Long, debug: Boolean = false): List[(Int, Long, Double)] = {
 
     import sparkSession.implicits._
 
-    val nodeCount: Long = publishedDatesDF.filter($"year" <= year).count()
-    val totalPossiblePairsForYear: Long = (nodeCount * (nodeCount - 1)) / 2
+    println(s"totalPairs: $totalPairs")
 
     /*
     Create bi-directional edges for the citationsDF:
@@ -283,12 +282,12 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     // Add on length 1
     val lengthOneCount: Long = shortestPathsOfLengthOne.count()
-    val lengthOnePercent: Double = (lengthOneCount * 1.0) / (totalPossiblePairsForYear * 1.0)
+    val lengthOnePercent: Double = (lengthOneCount * 1.0) / (totalPairs * 1.0)
     results += ((1, lengthOneCount, lengthOnePercent))
 
     // Add on length 2
     val lengthTwoCount: Long = subtractedAndDistinct.count()
-    val lengthTwoPercent: Double = (lengthTwoCount * 1.0) / (totalPossiblePairsForYear * 1.0)
+    val lengthTwoPercent: Double = (lengthTwoCount * 1.0) / (totalPairs * 1.0)
     results += ((2, lengthTwoCount, lengthTwoPercent))
 
     // Unpersist length 1/2 since they are no longer needed
@@ -300,7 +299,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     var generatedNewPaths: Boolean = true
     var count: Long = 0
 
-    while (generatedNewPaths && (count < totalPossiblePairsForYear)) {
+    while (generatedNewPaths && (count < totalPairs)) {
       pathLength += 1
       val previousCount: Long = subtractedAndDistinct.count()
 
@@ -311,7 +310,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         .reduceByKey((a: Array[Int], b: Array[Int]) => a, numPartitions = 16)
 
       count = subtractedAndDistinct.count()
-      val countPercentage: Double = (count * 1.0) / (totalPossiblePairsForYear * 1.0)
+      val countPercentage: Double = (count * 1.0) / (totalPairs * 1.0)
       generatedNewPaths = if (previousCount == count) false else true
       results += ((pathLength, count, countPercentage))
     }
