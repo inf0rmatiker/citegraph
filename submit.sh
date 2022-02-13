@@ -18,7 +18,7 @@ if [[ $# -eq 3 ]]; then
     --deploy-mode cluster \
     --driver-memory 16g \
     --executor-memory 4g \
-    --executor-cores 1 \
+    --executor-cores 4 \
     target/scala-2.12/citegraph_2.12-0.1.jar "$HDFS_INPUT_DIR" "$HDFS_OUTPUT_DIR"
 else
   print_usage
