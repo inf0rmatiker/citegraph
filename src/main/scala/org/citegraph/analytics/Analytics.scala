@@ -176,7 +176,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     // citationsDF size: 421,578, bidirectionalEdgesDF size: 843,156
     //printf("citationsDF size: %,d, bidirectionalEdgesDF size: %,d\n", citationsDF.count(), bidirectionalEdgesDF.count())
-
+    println("citationsDF.count " + citationsDF.count())
     val bidirectionalFilteredByYear: RDD[(Int, Int)] = citationsDF
       .join(
         publishedDatesDF,
