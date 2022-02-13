@@ -274,7 +274,9 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .subtractByKey(shortestPathsOfLengthOne)
       .union(shortestPathsOfLengthOne)
       .sortByKey(ascending = true)
-      .reduceByKey((a: Array[Int], b: Array[Int]) => a, numPartitions = 16)
+
+    subtractedAndDistinct = subtractedAndDistinct.toDF("endpoints", "path")
+      .dropDuplicates("endpoints").rdd.map(row => (row.getString(0), row.getAs[Array[Int]](1)))
 
     if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
 
@@ -307,7 +309,9 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         .subtractByKey(subtractedAndDistinct)
         .union(subtractedAndDistinct)
         .sortByKey(ascending = true)
-        .reduceByKey((a: Array[Int], b: Array[Int]) => a, numPartitions = 16)
+
+      subtractedAndDistinct = subtractedAndDistinct.toDF("endpoints", "path")
+        .dropDuplicates("endpoints").rdd.map(row => (row.getString(0), row.getAs[Array[Int]](1)))
 
       count = subtractedAndDistinct.count()
       val countPercentage: Double = (count * 1.0) / (totalPairs * 1.0)
