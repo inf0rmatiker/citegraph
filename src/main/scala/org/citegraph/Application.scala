@@ -87,8 +87,8 @@ object Application {
     //val densities: DataFrame = analytics.findDensitiesByYear()
     val nodePairs: Array[(Int, Long)] = loadTotalNodePairsFromCSV(sparkSession)
     val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(
-      year = nodePairs(0)._1,
-      totalPairs = nodePairs(0)._2,
+      year = if (isTestingEnv) 1998 else nodePairs(0)._1,
+      totalPairs = if (isTestingEnv) 100 else nodePairs(0)._2,
       debug = isTestingEnv
     )
     print("tableByYear:\n")
