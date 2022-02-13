@@ -99,7 +99,7 @@ object Application {
 
     // Save DataFrames as .csv files to HDFS output directory
     val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
-    dataframeSaver.saveSortedAsCsv(filename = "diameter_1998.csv", resultsDF, sortByCol = "d")
+    dataframeSaver.saveSortedAsCsv(filename = "diameter", resultsDF, sortByCol = "d")
 
     sparkSession.close()
   }
