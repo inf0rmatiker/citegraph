@@ -25,9 +25,9 @@ object Application {
     println()
   }
 
-  def loadTotalNodePairsFromCSV(directory: String = "hdfs://ant:30201/cs535/data"): List[(Int, Long)] = {
+  def loadTotalNodePairsFromCSV(): List[(Int, Long)] = {
     val nodePairs: ListBuffer[(Int, Long)] = ListBuffer[(Int, Long)]()
-    val bufferedSource = Source.fromFile(s"$directory/nodepairs.csv")
+    val bufferedSource = Source.fromFile("hdfs://ant:30201/cs535/data/nodepairs.csv")
     for (line <- bufferedSource.getLines) {
       val cols: Array[String] = line.split(",").map(_.trim)
       nodePairs += ((cols(0).toInt, cols(1).toLong))
