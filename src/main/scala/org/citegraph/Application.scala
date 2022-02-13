@@ -1,5 +1,6 @@
 package org.citegraph
 
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.citegraph.analytics.Analytics
 import org.citegraph.loading.DataFrameLoader
@@ -25,15 +26,12 @@ object Application {
     println()
   }
 
-  def loadTotalNodePairsFromCSV(): List[(Int, Long)] = {
-    val nodePairs: ListBuffer[(Int, Long)] = ListBuffer[(Int, Long)]()
-    val bufferedSource = Source.fromFile("hdfs://ant:30201/cs535/data/nodepairs.csv")
-    for (line <- bufferedSource.getLines) {
-      val cols: Array[String] = line.split(",").map(_.trim)
-      nodePairs += ((cols(0).toInt, cols(1).toLong))
-    }
-    bufferedSource.close
-    nodePairs.toList
+  def loadTotalNodePairsFromCSV(sparkSession: SparkSession): Array[(Int, Long)] = {
+    val rddFromFile: RDD[String] = sparkSession.sparkContext.textFile("hdfs://ant:30201/cs535/data/nodepairs.csv")
+    rddFromFile.map(f=>{
+      val parts = f.split(",")
+      (parts(0).toInt, parts(1).toLong)
+    }).collect()
   }
 
   def isValidHdfsUri(uri: String): Boolean = {
@@ -87,7 +85,7 @@ object Application {
     // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
     //val densities: DataFrame = analytics.findDensitiesByYear()
-    val nodePairs: List[(Int, Long)] = loadTotalNodePairsFromCSV()
+    val nodePairs: Array[(Int, Long)] = loadTotalNodePairsFromCSV(sparkSession)
     val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(
       year = nodePairs(1)._1,
       totalPairs = nodePairs(1)._2,
