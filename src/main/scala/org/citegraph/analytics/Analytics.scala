@@ -211,7 +211,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       val key: String = "%d~%d".format(from, to)
       val value: Array[Int] = Array(from, to)
       (key, value)
-    }).rdd
+    }).rdd.reduceByKey((a: Array[Int], _: Array[Int]) => a)
 
     if (debug) collectAndPrintPairRDD(shortestPathsOfLengthOne, "shortestPathsOfLengthOne")
 
@@ -266,7 +266,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       val endpoints: String = parts(0)
       val path: Array[Int] = parts(1).split(",").map(_.toInt)
       (endpoints, path)
-    })
+    }).reduceByKey((a: Array[Int], _: Array[Int]) => a)
 
     if (debug) collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
 
@@ -274,11 +274,6 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .subtractByKey(shortestPathsOfLengthOne)
       .union(shortestPathsOfLengthOne)
       .sortByKey(ascending = true)
-
-    subtractedAndDistinct = subtractedAndDistinct.toDF("endpoints", "path")
-      .dropDuplicates("endpoints")
-      .rdd
-      .map(f=>(f.getString(0), f.getAs[Array[Int]](1)))
 
     if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
 
@@ -307,15 +302,10 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       pathLength += 1
       val previousCount: Long = subtractedAndDistinct.count()
 
-      val subtractedAndDistinctDF: DataFrame = generateNextShortestPaths(pathLength, subtractedAndDistinct, adjacencyMap)
+      subtractedAndDistinct = generateNextShortestPaths(pathLength, subtractedAndDistinct, adjacencyMap)
         .subtractByKey(subtractedAndDistinct)
         .union(subtractedAndDistinct)
         .sortByKey(ascending = true)
-        .toDF("endpoints", "path")
-
-      subtractedAndDistinctDF.dropDuplicates("endpoints").printSchema()
-
-      //.map(row => (row.getString(0), row.getList(1).toArray()))
 
       count = subtractedAndDistinct.count()
       val countPercentage: Double = (count * 1.0) / (totalPairs * 1.0)
@@ -351,7 +341,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         val endpoints: String = parts(0)
         val path: Array[Int] = parts(1).split(",").map(_.toInt)
         (endpoints, path)
-      })
+      }).reduceByKey((a: Array[Int], _: Array[Int]) => a)
   }
 
   def collectAndPrintPairRDD(pairRDD: RDD[(String, Array[Int])], name: String): Unit = {
