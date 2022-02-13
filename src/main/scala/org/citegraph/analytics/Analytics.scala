@@ -165,89 +165,70 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
                               |    ...|    ...|
                               +-------+-------+
      */
-    val bidirectionalEdgesDF: DataFrame = citationsDF
-      .alias("invertedCitationsDF")  // Make a copy of citationsDF
-      .map(row => {
-        val from_original: Int = row.getInt(0)
-        val to_original: Int = row.getInt(1)
-        (to_original, from_original)  // Flip the (from, to) -> (to, from)
-      }).toDF("from", "to")  // Convert to Dataset (ignore the toDF function name)
-      .union(citationsDF)  // Union back with the original citations DF
+//    val bidirectionalEdgesDF: DataFrame = citationsDF
+//      .alias("invertedCitationsDF")  // Make a copy of citationsDF
+//      .map(row => {
+//        val from_original: Int = row.getInt(0)
+//        val to_original: Int = row.getInt(1)
+//        (to_original, from_original)  // Flip the (from, to) -> (to, from)
+//      }).toDF("from", "to")  // Convert to Dataset (ignore the toDF function name)
+//      .union(citationsDF)  // Union back with the original citations DF
 
     // citationsDF size: 421,578, bidirectionalEdgesDF size: 843,156
-    printf("citationsDF size: %,d, bidirectionalEdgesDF size: %,d\n", citationsDF.count(), bidirectionalEdgesDF.count())
+    //printf("citationsDF size: %,d, bidirectionalEdgesDF size: %,d\n", citationsDF.count(), bidirectionalEdgesDF.count())
 
-    /*
-     Filter all the edge pairs by only allowing pairs where both the "from" and the "to" ids are
-     equal to or less than the given "year" parameter:
-      +-------+-------+--------+------+
-      |   from|     to|fromYear|toYear|
-      +-------+-------+--------+------+
-      |9409356|9301254|    1994|  1993|
-      |9502280|9301254|    1995|  1993|
-      |9404228|9301254|    1994|  1993|
-      |9407347|9301254|    1994|  1993|
-      |    ...|    ...|     ...|   ...|
-      +-------+-------+--------+------+
-     */
-    val filteredByYearDF: DataFrame = bidirectionalEdgesDF.join(
-      publishedDatesDF,
-      bidirectionalEdgesDF("from") === publishedDatesDF("id")
-    ).drop(col("id"))
-      .withColumnRenamed(existingName = "year", newName = "fromYear")
-      .filter($"fromYear" <= year)
+    val bidirectionalFilteredByYear: RDD[(Int, Int)] = citationsDF
       .join(
         publishedDatesDF,
-        bidirectionalEdgesDF("to") === publishedDatesDF("id")
-      ).drop(col("id"))
+        citationsDF("from") === publishedDatesDF("id")
+      )
+      .drop(col("id"))
+      .withColumnRenamed(existingName = "year", newName = "fromYear")
+      .join(
+        publishedDatesDF,
+        citationsDF("to") === publishedDatesDF("id")
+      )
+      .drop(col("id"))
       .withColumnRenamed(existingName = "year", newName = "toYear")
-      .filter($"toYear" <= year)
+      .filter($"fromYear" <= year && $"toYear <= year")
       .drop("fromYear", "toYear")
+      .flatMap(row => {
+        List((row.getInt(0), row.getInt(1)), (row.getInt(1), row.getInt(0)))
+      }).rdd
 
-    val shortestPathsOfLengthOne: RDD[(String, Array[Int])] = filteredByYearDF.map(row => {
-      var from: Int = row.getInt(0)
-      var to: Int = row.getInt(1)
-      if (to < from) { val temp = from; from = to; to = temp; } // Swap if to < from
-      val key: String = "%d~%d".format(from, to)
-      val value: Array[Int] = Array(from, to)
-      (key, value)
-    }).rdd.reduceByKey((a: Array[Int], _: Array[Int]) => a)
+    if (debug) {
+      println("RDD[(Int, Int)] bidirectionalFilteredByYear:")
+      bidirectionalFilteredByYear.collect().foreach{println}
+      println()
+    }
 
-    if (debug) collectAndPrintPairRDD(shortestPathsOfLengthOne, "shortestPathsOfLengthOne")
 
     /*
      Creates an id -> [adjacency list] mapping for nodes 1 edge away.
-      +-------+--------------------+
-      |     id|           neighbors|
-      +-------+--------------------+
-      |9501400|[9401341, 9210224...|
-      |9405400|[9511399, 9510283...|
-      |9509400|[9305287, 9302302...|
-      |9403400|           [9509378]|
-      |9406400|  [9410338, 9310210]|
-      |9504400|[9209277, 9410240...|
-      |9502400|[9505210, 9508402...|
-      |9407400|  [9403328, 9501246]|
-      |9512400|[9311222, 9501394...|
-      |    ...|                 ...|
-      +-------+--------------------+
      */
-    val adjacencyList: RDD[(Int, Array[Int])] = filteredByYearDF.drop("fromYear", "toYear")  // Drop the year cols from above
+    val adjacencyList: RDD[(Int, Array[Int])] = bidirectionalFilteredByYear
       .map(row => {  // Convert all the "to" values to a Scala List containing the "to" value
-        (row.getInt(0), List(row.getInt(1)))
-      }).rdd.reduceByKey((a: List[Int], b: List[Int]) => {  // Convert to rdd so we can use reduceByKey API
-        a ::: b  // Merge all the Lists sharing the same "from" key ( ":::" is a Scala List merge operator )
-      }).map(row => {
-      (row._1, row._2.toArray)
-    })
+        (row._1, List(row._2))
+      }).reduceByKey((a: List[Int], b: List[Int]) => {  // Convert to rdd so we can use reduceByKey API
+      a ::: b  // Merge all the Lists sharing the same "from" key ( ":::" is a Scala List merge operator )
+    }).map(row => {
+      (row._1, row._2.toArray) // Convert value from List[Int] to Array[Int]
+    }).sortByKey(ascending = true)
 
+    collectAndPrintMapRDD(adjacencyList, "adjacencyMap")
     val adjacencyMap: Map[Int, Array[Int]] = adjacencyList.collectAsMap()
-    printAdjacencyMap(adjacencyMap)
 
-    val pathsOfLengthTwo: RDD[(String, Array[Int])] = adjacencyList.flatMap(row => {
+    val bidirectionalPathsOfLengthOne: RDD[((Int, Int), Array[Int])] = bidirectionalFilteredByYear.map(row => {
+      ((row._1, row._2), Array(row._1, row._2))
+    }).sortByKey(ascending = true)
+
+    if (debug) collectAndPrintPairRDD(bidirectionalPathsOfLengthOne, "bidirectionalPathsOfLengthOne")
+
+
+    val pathsOfLengthTwo: RDD[((Int, Int), Array[Int])] = adjacencyList.flatMap(row => {
       val id: Int = row._1
       val neighbors: Array[Int] = row._2
-      val edges: ListBuffer[String] = ListBuffer[String]()
+      val edges: ListBuffer[((Int, Int), Array[Int])] = ListBuffer[((Int, Int), Array[Int])]()
       if (neighbors.length > 1) {
         for (i: Int <- 0 to (neighbors.length-2)) {
           for (j: Int <- (i + 1).until(neighbors.length)) {
@@ -256,21 +237,61 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
             // Swap if end < start
             if (end < start) { val temp = end; end = start; start = temp }
-            edges += s"$start~$end:$start,$id,$end"
+            edges += ((start,end), Array(start,id,end))
           }
         }
       }
       edges.toList
-    }).map(encodedString => {
-      val parts: Array[String] = encodedString.split(":")
-      val endpoints: String = parts(0)
-      val path: Array[Int] = parts(1).split(",").map(_.toInt)
-      (endpoints, path)
     }).reduceByKey((a: Array[Int], _: Array[Int]) => a)
+      .sortByKey(ascending = true)
 
     if (debug) collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
 
-    var subtractedAndDistinct: RDD[(String, Array[Int])] = pathsOfLengthTwo
+    /*
+      ((9, 11), [9, 8, 11])  --> (9,  [11, 8, 9])
+                             --> (11, [9, 8, 11])
+     */
+    val combinationTwo: RDD[(Int, Array[Int])] = pathsOfLengthTwo.flatMap( row => {
+      val path: Array[Int] = row._2
+      val start: Int = path(0); val end: Int = path(path.length-1)
+      // val originalPathString: String = "%d:%s".format(start, path.mkString(","))
+      val backwardsPath: Array[Int] = new Array[Int](path.length)
+      for (i <- path.length-1 to 0 by -1) {
+        backwardsPath((path.length-1) - i) = path(i)
+      }
+      //val backwardsPathString: String = "%d:%s".format(end, backwardsPath.mkString(","))
+      List((start, backwardsPath), (end, path))
+    })
+    if (debug) collectAndPrintMapRDD(combinationTwo, "combinationTwo")
+
+    /*
+      ((4, 9), [4, 9])  --> (4, [4, 9])
+      ((9, 4), [9, 4])  --> (9, [9, 4])
+     */
+    val combinationOne: RDD[(Int, Array[Int])] = bidirectionalPathsOfLengthOne.map(row => (row._1._1, row._2))
+    if (debug) collectAndPrintMapRDD(combinationOne, "combinationOne")
+
+    val combinationThree: RDD[((Int, Int), Array[Int])] = combinationTwo.join(combinationOne).map(row => {
+      val pivot: Int = row._1 // The point that we are joining the 2-path and 1-path on
+      val toPath: Array[Int] = row._2._1 // The path that leads to the pivot point
+      val fromPath: Array[Int] = row._2._2 // The path that leads away from the pivot point
+      // Allocate array big enough for both paths, minus the duplicate pivot point
+
+      val fullPath: Array[Int] = new Array[Int](toPath.length + fromPath.length - 1)
+      for (i <- toPath.indices) {
+        fullPath(i) = toPath(i)
+      }
+
+      for (i <- 1 until fromPath.length) {
+        fullPath(toPath.length + (i-1)) = fromPath(i)
+      }
+      val start: Int = fullPath(0); val end: Int = fullPath(fullPath.length-1)
+      ((start, end), fullPath)
+    })
+    if (debug) collectAndPrintPairRDD(combinationThree, "combinationThree")
+
+
+    /*var subtractedAndDistinct: RDD[(String, Array[Int])] = pathsOfLengthTwo
       .subtractByKey(shortestPathsOfLengthOne)
       .union(shortestPathsOfLengthOne)
       .sortByKey(ascending = true)
@@ -314,8 +335,9 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     }
 
     println(s"Stopped at $pathLength path length")
-    if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
-    results.toList
+    if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")*/
+    // results.toList
+    List()
   }
 
   // .filter(row => row._2.length == nextPathLength)
@@ -364,22 +386,23 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       }).reduceByKey((a: Array[Int], _: Array[Int]) => a)
   }
 
-  def collectAndPrintPairRDD(pairRDD: RDD[(String, Array[Int])], name: String): Unit = {
-    val collected: Array[(String, Array[Int])] = pairRDD.collect()
+  def collectAndPrintPairRDD(pairRDD: RDD[((Int,Int), Array[Int])], name: String): Unit = {
+    val collected: Array[((Int,Int), Array[Int])] = pairRDD.collect()
     val sb: mutable.StringBuilder = mutable.StringBuilder.newBuilder
-    sb.append(s"PairRDD[(String, Array[Int])] $name:\n")
+    sb.append(s"PairRDD[((Int,Int)), Array[Int])] $name:\n")
     collected.foreach{ x =>
       val arrayStr: String = x._2.mkString("Array(",",",")")
-      sb.append("\t(\"%s\", %s)\n".format(x._1, arrayStr))
+      sb.append("\t(\"(%d,%d)\", %s)\n".format(x._1._1, x._1._2, arrayStr))
     }
     println(sb.toString())
   }
 
-  def printAdjacencyMap(adjacencyMap: Map[Int, Array[Int]]): Unit = {
+  def collectAndPrintMapRDD(mapRDD: RDD[(Int, Array[Int])], name: String): Unit = {
+    val collectedMap: Map[Int, Array[Int]] = mapRDD.collectAsMap()
     val sb: mutable.StringBuilder = mutable.StringBuilder.newBuilder
-    sb.append("AdjacencyMap:\n")
-    adjacencyMap.keys.foreach{ key =>
-      sb.append("\t(%d -> %s)\n".format(key, adjacencyMap(key).mkString("Array(",",",")")))
+    sb.append(s"RDD[(Int, Array[Int])] $name:\n")
+    collectedMap.keys.foreach{ key =>
+      sb.append("\t(%d, %s)\n".format(key, collectedMap(key).mkString("Array(",",",")")))
     }
     println(sb.toString())
   }
