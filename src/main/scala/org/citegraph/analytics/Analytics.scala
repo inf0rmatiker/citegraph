@@ -392,7 +392,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     sb.append(s"PairRDD[((Int,Int)), Array[Int])] $name:\n")
     collected.foreach{ x =>
       val arrayStr: String = x._2.mkString("Array(",",",")")
-      sb.append("\t(\"(%d,%d)\", %s)\n".format(x._1._1, x._1._2, arrayStr))
+      sb.append("\t((%d, %d), %s)\n".format(x._1._1, x._1._2, arrayStr))
     }
     println(sb.toString())
   }
