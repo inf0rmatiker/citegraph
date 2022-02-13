@@ -190,7 +190,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       )
       .drop(col("id"))
       .withColumnRenamed(existingName = "year", newName = "toYear")
-      .filter($"fromYear" <= year && $"toYear <= year")
+      .filter($"fromYear" <= year && $"toYear" <= year)
       .drop("fromYear", "toYear")
       .flatMap(row => {
         List((row.getInt(0), row.getInt(1)), (row.getInt(1), row.getInt(0)))
