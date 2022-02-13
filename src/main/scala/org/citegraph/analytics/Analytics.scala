@@ -275,7 +275,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .subtractByKey(shortestPathsOfLengthOne)
       .union(shortestPathsOfLengthOne)
       .sortByKey(ascending = true)
-      .reduceByKey((a: Array[Int], b: Array[Int]) => a)
+      .reduceByKey((a: Array[Int], b: Array[Int]) => a, numPartitions = 16)
 
     if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
 
@@ -291,6 +291,10 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     val lengthTwoPercent: Double = (lengthTwoCount * 1.0) / (totalPossiblePairsForYear * 1.0)
     results += ((2, lengthTwoCount, lengthTwoPercent))
 
+    // Unpersist length 1/2 since they are no longer needed
+    pathsOfLengthTwo.unpersist()
+    shortestPathsOfLengthOne.unpersist()
+
     // Length 3 and up
     var pathLength: Int = 2
     var generatedNewPaths: Boolean = true
@@ -304,7 +308,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         .subtractByKey(subtractedAndDistinct)
         .union(subtractedAndDistinct)
         .sortByKey(ascending = true)
-        .reduceByKey((a: Array[Int], b: Array[Int]) => a)
+        .reduceByKey((a: Array[Int], b: Array[Int]) => a, numPartitions = 16)
 
       count = subtractedAndDistinct.count()
       val countPercentage: Double = (count * 1.0) / (totalPossiblePairsForYear * 1.0)
