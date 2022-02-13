@@ -318,9 +318,10 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     results.toList
   }
 
+  // .filter(row => row._2.length == nextPathLength)
   def generateNextShortestPaths(nextPathLength: Int, currentShortestPaths: RDD[(String, Array[Int])],
                                 adjacencyMap: Map[Int, Array[Int]]): RDD[(String, Array[Int])] = {
-    currentShortestPaths.filter(row => row._2.length == nextPathLength).flatMap{
+    currentShortestPaths.flatMap{
         case(endpoints: String, path: Array[Int]) =>
           var edges: ListBuffer[String] = ListBuffer()
           val firstElement: Int = path(0)
