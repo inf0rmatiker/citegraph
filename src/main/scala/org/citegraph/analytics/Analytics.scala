@@ -237,7 +237,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
             // Swap if end < start
             if (end < start) { val temp = end; end = start; start = temp }
-            edges += ((start,end), Array(start,id,end))
+            edges += (((start,end), Array(start,id,end)))
           }
         }
       }
