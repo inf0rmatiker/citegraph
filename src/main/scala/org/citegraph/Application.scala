@@ -83,7 +83,8 @@ object Application {
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
     //val densities: DataFrame = analytics.findDensitiesByYear()
     val nodePairs: Array[(Int, Long)] = loadTotalNodePairsFromCSV(sparkSession)
-    for (nodePairYear: (Int, Long) <- nodePairs) {
+    for (i: Int <- 2 until nodePairs.length) {
+      val nodePairYear: (Int, Long) = nodePairs(i)
       val year: Int = nodePairYear._1
       val totalPairs: Long = nodePairYear._2
       val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(
