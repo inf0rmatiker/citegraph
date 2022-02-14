@@ -465,14 +465,11 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         }
         newRows.toList
     }.reduceByKey((a: Array[Int], _: Array[Int]) => a)
-      .sortByKey(ascending = true)
   }
 
   def combineWithPathsOfLengthD(pathsOfLengthD: RDD[((Int, Int), Array[Int])],
                                 currentShortestPaths: RDD[((Int, Int), Array[Int])]): RDD[((Int, Int), Array[Int])] = {
-    pathsOfLengthD.subtractByKey(currentShortestPaths)
-      .union(currentShortestPaths)
-      .sortByKey(ascending = true)
+    pathsOfLengthD.subtractByKey(currentShortestPaths).union(currentShortestPaths)
   }
 
   def collectAndPrintPairRDD(pairRDD: RDD[((Int,Int), Array[Int])], name: String): Unit = {
