@@ -187,75 +187,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     pathsOfLengthDRDDs.head.unpersist() // Unpersist head of list (paths of length 1)
     pathsOfLengthDRDDs.remove(0) // Chop off head of list, Garbage Collection will clean up now that references are gone
 
-/*    d += 1  // d = 3
-    pathsOfLengthDRDDs += pathsOfLengthDRDDs.last.flatMap{
-      case((start: Int, end: Int), path: Array[Int]) =>
-        val newRows: ListBuffer[((Int, Int), Array[Int])] = new ListBuffer[((Int, Int), Array[Int])]()
-        val firstElementNeighbors: Array[Int] = adjacencyMap(start)
-        val lastElementNeighbors: Array[Int] = adjacencyMap(end)
-
-        // Iterate over neighbors of first element and see if there's any not already in the path
-        // If there are, prepend it to the path.
-        for (neighbor: Int <- firstElementNeighbors) {
-          if (!path.contains(neighbor)) {
-            val newStart: Int = neighbor
-            val newEnd: Int = end
-
-            // Swap if end < start
-            val newKey: (Int, Int) = if (newEnd < newStart) (newEnd, newStart) else (newStart, newEnd)
-
-            // New array: [ <start_neighbor>, <original_path> ]
-            val newPath: Array[Int] = new Array[Int](path.length + 1)
-            newPath(0) = newStart
-            for (i <- path.indices) newPath(i+1) = path(i)
-            newRows += ((newKey, newPath))
-          }
-        }
-
-        // Iterate over neighbors of last element and see if there's any not already in the path.
-        // If there are, append it to the path.
-        for (neighbor: Int <- lastElementNeighbors) {
-          if (!path.contains(neighbor)) {
-            val newStart: Int = start
-            val newEnd: Int = neighbor
-
-            // Swap if end < start
-            val newKey: (Int, Int) = if (newEnd < newStart) (newEnd, newStart) else (newStart, newEnd)
-
-            // New array: [ <original_path>, <end_neighbor> ]
-            val newPath: Array[Int] = new Array[Int](path.length + 1)
-            for (i <- path.indices) newPath(i) = path(i)
-            newPath(newPath.length-1) = newEnd
-            newRows += ((newKey, newPath))
-          }
-        }
-        newRows.toList
-    }.reduceByKey((a: Array[Int], _: Array[Int]) => a, numPartitions = 16)
-      .sortByKey(ascending = true)
-
-    if (debug) collectAndPrintPairRDD(pathsOfLengthDRDDs.last, "pathsOfLengthThree")
-
-    // Done using paths of length 2, so can unpersist and delete
-    pathsOfLengthDRDDs.head.unpersist()
-    pathsOfLengthDRDDs.remove(0)
-
-    // Add on combined shortest paths of max length d = 3
-    combinedShortestPathsRDDs += pathsOfLengthDRDDs.last.subtractByKey(combinedShortestPathsRDDs.last)
-      .union(combinedShortestPathsRDDs.last)
-
-    // Add on length 3 to results
-    pairCount = combinedShortestPathsRDDs.last.count()
-    pairPercent = (pairCount * 1.0) / (totalPairs * 1.0)
-    results += ((d, pairCount, pairPercent))*/
-
-    //if (debug) collectAndPrintPairRDD(combinedShortestPathsRDDs.last, "combinedShortestPaths3")
-
-    // Done using combined shortest paths of max length d = 2, unpersist and delete
-//    combinedShortestPathsRDDs.head.unpersist()
-//    combinedShortestPathsRDDs.remove(0)
-
-
-    // ------------ Length 3 and up ------------
+    // ------------ d = 3 and up ------------
 
     var generatedNewPaths: Boolean = true
     var count: Long = 0
