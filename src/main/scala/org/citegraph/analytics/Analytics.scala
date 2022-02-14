@@ -151,6 +151,8 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     println(s"totalPairs: $totalPairs")
     val results: ListBuffer[(Int, Long, Double)] = ListBuffer[(Int, Long, Double)]()
+    val pathsOfLengthDRDDs: ListBuffer[RDD[((Int, Int), Array[Int])]] = ListBuffer[RDD[((Int, Int), Array[Int])]]()
+    val combinedShortestPathsRDDs: ListBuffer[RDD[((Int, Int), Array[Int])]] = ListBuffer[RDD[((Int, Int), Array[Int])]]()
 
     /*
     Create bi-directional edges for the citationsDF:
@@ -203,7 +205,6 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       println()
     }
 
-
     /*
      Creates an id -> [adjacency list] mapping for nodes 1 edge away.
      */
@@ -219,22 +220,24 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     collectAndPrintMapRDD(adjacencyList, "adjacencyMap")
     val adjacencyMap: Map[Int, Array[Int]] = adjacencyList.collectAsMap()
 
-    val pathsOfLengthOne: RDD[((Int, Int), Array[Int])] = bidirectionalFilteredByYear.map(row => {
+    // d = 1
+    var d: Int = 1
+    pathsOfLengthDRDDs += bidirectionalFilteredByYear.map(row => {
       val start: Int = row._1; val end: Int = row._2
       val key: (Int, Int) = if (end < start) (end, start) else (start, end)
       val path: Array[Int] = Array(start, end)
       (key, path)
-    }).reduceByKey((a: Array[Int], _: Array[Int]) => a)
-      .sortByKey(ascending = true)
+    }).reduceByKey((a: Array[Int], _: Array[Int]) => a, numPartitions = 16)
 
-    // Add on length 1
-    val lengthOneCount: Long = pathsOfLengthOne.count()
-    val lengthOnePercent: Double = (lengthOneCount * 1.0) / (totalPairs * 1.0)
-    results += ((1, lengthOneCount, lengthOnePercent))
+    // Add on length 1 results
+    var pairCount: Long = pathsOfLengthDRDDs.last.count()
+    var pairPercent: Double = (pairCount * 1.0) / (totalPairs * 1.0)
+    results += ((d, pairCount, pairPercent))
 
-    if (debug) collectAndPrintPairRDD(pathsOfLengthOne, "pathsOfLengthOne")
+    if (debug) collectAndPrintPairRDD(pathsOfLengthDRDDs.head, "pathsOfLengthOne")
 
-    val pathsOfLengthTwo: RDD[((Int, Int), Array[Int])] = adjacencyList.flatMap(row => {
+    d += 1  // d = 2
+    pathsOfLengthDRDDs += adjacencyList.flatMap(row => {
       val id: Int = row._1
       val neighbors: Array[Int] = row._2
       val edges: ListBuffer[((Int, Int), Array[Int])] = ListBuffer[((Int, Int), Array[Int])]()
@@ -251,21 +254,23 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
         }
       }
       edges.toList
-    }).reduceByKey((a: Array[Int], _: Array[Int]) => a)
-      .sortByKey(ascending = true)
+    }).reduceByKey((a: Array[Int], _: Array[Int]) => a, numPartitions = 16)
 
-    if (debug) collectAndPrintPairRDD(pathsOfLengthTwo, "pathsOfLengthTwo")
+    if (debug) collectAndPrintPairRDD(pathsOfLengthDRDDs(d-1), "pathsOfLengthTwo")
 
-    var combinedShortestPaths = pathsOfLengthTwo.subtractByKey(pathsOfLengthOne)
-      .union(pathsOfLengthOne)
-      .sortByKey(ascending = true)
+    // Combined shortest paths of length 1 and 2
+    combinedShortestPathsRDDs += pathsOfLengthDRDDs.last.subtractByKey(pathsOfLengthDRDDs.head)
+      .union(pathsOfLengthDRDDs.head)
 
-    // Add on length 2
-    val lengthTwoCount: Long = combinedShortestPaths.count()
-    val lengthTwoPercent: Double = (lengthTwoCount * 1.0) / (totalPairs * 1.0)
-    results += ((2, lengthTwoCount, lengthTwoPercent))
+    pathsOfLengthDRDDs.head.unpersist() // Unpersist head of list (paths of length 1)
+    pathsOfLengthDRDDs.remove(0) // Chop off head of list, hopefully GC takes care of the reference
 
-    if (debug) collectAndPrintPairRDD(combinedShortestPaths, "combinedShortestPaths")
+    // Add on length 2 results
+    pairCount = combinedShortestPathsRDDs.last.count()
+    pairPercent = (pairCount * 1.0) / (totalPairs * 1.0)
+    results += ((d, pairCount, pairPercent))
+
+    if (debug) collectAndPrintPairRDD(combinedShortestPathsRDDs.head, "combinedShortestPaths2")
 
     /*
       ((9, 11), [9, 8, 11])  --> (9,  [11, 8, 9])
@@ -311,8 +316,8 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     })
     if (debug) collectAndPrintPairRDD(combinationThree, "combinationThree")*/
 
-
-    val pathsOfLengthThree: RDD[((Int, Int), Array[Int])] = pathsOfLengthTwo.flatMap{
+    d += 1  // d = 3
+    pathsOfLengthDRDDs += pathsOfLengthDRDDs.last.flatMap{
       case((start: Int, end: Int), path: Array[Int]) =>
         val newRows: ListBuffer[((Int, Int), Array[Int])] = new ListBuffer[((Int, Int), Array[Int])]()
         val firstElementNeighbors: Array[Int] = adjacencyMap(start)
@@ -354,46 +359,58 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
           }
         }
         newRows.toList
-    }.reduceByKey((a: Array[Int], _: Array[Int]) => a)
+    }.reduceByKey((a: Array[Int], _: Array[Int]) => a, numPartitions = 16)
       .sortByKey(ascending = true)
 
-    if (debug) collectAndPrintPairRDD(pathsOfLengthThree, "pathsOfLengthThree")
+    if (debug) collectAndPrintPairRDD(pathsOfLengthDRDDs.last, "pathsOfLengthThree")
 
-    combinedShortestPaths = pathsOfLengthThree.subtractByKey(combinedShortestPaths)
-      .union(combinedShortestPaths)
-      .sortByKey(ascending = true)
+    // Done using paths of length 2, so can unpersist and delete
+    pathsOfLengthDRDDs.head.unpersist()
+    pathsOfLengthDRDDs.remove(0)
 
-    // Add on length 3
-    val lengthThreeCount: Long = combinedShortestPaths.count()
-    val lengthThreePercent: Double = (lengthThreeCount * 1.0) / (totalPairs * 1.0)
-    results += ((3, lengthThreeCount, lengthThreePercent))
+    // Add on combined shortest paths of max length d = 3
+    combinedShortestPathsRDDs += pathsOfLengthDRDDs.last.subtractByKey(combinedShortestPathsRDDs.last)
+      .union(combinedShortestPathsRDDs.last)
 
-    if (debug) collectAndPrintPairRDD(combinedShortestPaths, "combinedShortestPaths")
+    // Add on length 3 to results
+    pairCount = combinedShortestPathsRDDs.last.count()
+    pairPercent = (pairCount * 1.0) / (totalPairs * 1.0)
+    results += ((d, pairCount, pairPercent))
 
-    // Length 4 and up
-    var pathLength: Int = 3
+    if (debug) collectAndPrintPairRDD(combinedShortestPathsRDDs.last, "combinedShortestPaths3")
+
+    // Done using combined shortest paths of max length d = 2, unpersist and delete
+    combinedShortestPathsRDDs.head.unpersist()
+    combinedShortestPathsRDDs.remove(0)
+
+
+    // ------------ Length 4 and up --------------
+
     var generatedNewPaths: Boolean = true
     var count: Long = 0
 
     while (generatedNewPaths && (count < totalPairs)) {
-      pathLength += 1
-      val previousCount: Long = combinedShortestPaths.count()
+      d += 1
+      val previousCount: Long = combinedShortestPathsRDDs.last.count()
 
-      val pathsOfLengthD: RDD[((Int, Int), Array[Int])] = generatePathsOfLengthD(combinedShortestPaths, adjacencyMap)
-      combinedShortestPaths = combineWithPathsOfLengthD(pathsOfLengthD, combinedShortestPaths)
+      pathsOfLengthDRDDs += generatePathsOfLengthD(pathsOfLengthDRDDs.last, adjacencyMap)
+      combinedShortestPathsRDDs += combineWithPathsOfLengthD(pathsOfLengthDRDDs.last, combinedShortestPathsRDDs.last)
 
-      count = combinedShortestPaths.count()
+      count = combinedShortestPathsRDDs.last.count()
       val countPercentage: Double = (count * 1.0) / (totalPairs * 1.0)
       generatedNewPaths = if (previousCount == count) false else true
-      results += ((pathLength, count, countPercentage))
+      results += ((d, count, countPercentage))
+
+      pathsOfLengthDRDDs.head.unpersist()
+      pathsOfLengthDRDDs.remove(0)
+      combinedShortestPathsRDDs.head.unpersist()
+      combinedShortestPathsRDDs.remove(0)
     }
 
-    println(s"Stopped at $pathLength path length")
+    println(s"Stopped at $d path length")
     /*
 
-    // Unpersist length 1/2 since they are no longer needed
-    pathsOfLengthTwo.unpersist()
-    shortestPathsOfLengthOne.unpersist()
+
 
 
 
