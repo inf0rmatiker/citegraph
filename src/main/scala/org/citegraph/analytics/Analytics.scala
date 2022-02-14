@@ -145,9 +145,11 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     Question 2 Functions: TODO: Remove this banner. This is just to temporarily help organize
    --------------------------------------------------------------------------------------------*/
 
+  /**
+   * Finds the length (d) of the maximum shortest path needed to be calculated between nodes
+   * to represent at least 90% of all possible node pairs in the graph.
+   */
   def findGraphDiameterByYear(year: Int, totalPairs: Long, debug: Boolean = false): List[(Int, Long, Double)] = {
-
-    import sparkSession.implicits._
 
     println(s"totalPairs: $totalPairs")
     val results: ListBuffer[(Int, Long, Double)] = ListBuffer[(Int, Long, Double)]()
@@ -162,7 +164,6 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
      Creates an adjacency list mapping for nodes 1 edge away, i.e:
      (1, [<neighbors_1>]),
      (2, [<neighbors_2>]),
-     (3, [<neighbors_3>]),
      ...
      (n, [<neighbors_n>])
      */
@@ -172,51 +173,19 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     // d = 1
     var d: Int = 1
-    pathsOfLengthDRDDs += bidirectionalFilteredByYear.map(row => {
-      val start: Int = row._1; val end: Int = row._2
-      val key: (Int, Int) = if (end < start) (end, start) else (start, end)
-      val path: Array[Int] = Array(start, end)
-      (key, path)
-    }).reduceByKey((a: Array[Int], _: Array[Int]) => a, numPartitions = 16)
-
+    pathsOfLengthDRDDs += getPathsOfLengthOneRDD(bidirectionalFilteredByYear)
     if (debug) collectAndPrintPairRDD(pathsOfLengthDRDDs.head, "pathsOfLengthOne")
-
-    // Add on d = 1 results
-    recordResultsForD(d, totalPairs, pathsOfLengthDRDDs.last, results)
+    recordResultsForD(d, totalPairs, pathsOfLengthDRDDs.last, results) // Add on d = 1 results
 
     d += 1  // d = 2
-    pathsOfLengthDRDDs += adjacencyListRDD.flatMap(row => {
-      val id: Int = row._1
-      val neighbors: Array[Int] = row._2
-      val edges: ListBuffer[((Int, Int), Array[Int])] = ListBuffer[((Int, Int), Array[Int])]()
-      if (neighbors.length > 1) {
-        for (i: Int <- 0 to (neighbors.length-2)) {
-          for (j: Int <- (i + 1).until(neighbors.length)) {
-            var start: Int = neighbors(i)
-            var end: Int = neighbors(j)
-
-            // Swap if end < start
-            if (end < start) { val temp = end; end = start; start = temp }
-            edges += (((start,end), Array(start,id,end)))
-          }
-        }
-      }
-      edges.toList
-    }).reduceByKey((a: Array[Int], _: Array[Int]) => a, numPartitions = 16)
-
+    pathsOfLengthDRDDs += getPathsOfLengthTwoRDD(adjacencyListRDD)
     if (debug) collectAndPrintPairRDD(pathsOfLengthDRDDs(d-1), "pathsOfLengthTwo")
-
-    // Combined shortest paths of length 1 and 2
-    combinedShortestPathsRDDs += pathsOfLengthDRDDs.last.subtractByKey(pathsOfLengthDRDDs.head)
-      .union(pathsOfLengthDRDDs.head)
+    combinedShortestPathsRDDs += combineWithPathsOfLengthD(pathsOfLengthDRDDs.last, pathsOfLengthDRDDs.head)
+    recordResultsForD(d, totalPairs, combinedShortestPathsRDDs.last, results) // Add on d = 2 results
+    if (debug) collectAndPrintPairRDD(combinedShortestPathsRDDs.head, "combinedShortestPaths2")
 
     pathsOfLengthDRDDs.head.unpersist() // Unpersist head of list (paths of length 1)
     pathsOfLengthDRDDs.remove(0) // Chop off head of list, Garbage Collection will clean up now that references are gone
-
-    // Add on d = 2 results
-    recordResultsForD(d, totalPairs, combinedShortestPathsRDDs.last, results)
-
-    if (debug) collectAndPrintPairRDD(combinedShortestPathsRDDs.head, "combinedShortestPaths2")
 
 /*    d += 1  // d = 3
     pathsOfLengthDRDDs += pathsOfLengthDRDDs.last.flatMap{
@@ -314,6 +283,10 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     results.toList
   }
 
+  /**
+   * Uses the adjacency map and paths of length d-1 to generate paths of length d by adding to
+   * the beginning or end of the original paths.
+   */
   def generatePathsOfLengthD(pathsOfLengthDMinusOne: RDD[((Int, Int), Array[Int])],
                                 adjacencyMap: Map[Int, Array[Int]]): RDD[((Int, Int), Array[Int])] = {
     pathsOfLengthDMinusOne.flatMap{
@@ -361,11 +334,18 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     }.reduceByKey((a: Array[Int], _: Array[Int]) => a)
   }
 
+  /**
+   * Combines the distinct paths of length d with the current known shortest paths up to length d-1.
+   */
   def combineWithPathsOfLengthD(pathsOfLengthD: RDD[((Int, Int), Array[Int])],
                                 currentShortestPaths: RDD[((Int, Int), Array[Int])]): RDD[((Int, Int), Array[Int])] = {
     pathsOfLengthD.subtractByKey(currentShortestPaths).union(currentShortestPaths)
   }
 
+  /**
+   * Collects a PairRDD[((Int, Int), Array[Int])] and prints it in a readable format.
+   * Don't use on massive RDDs.
+   */
   def collectAndPrintPairRDD(pairRDD: RDD[((Int, Int), Array[Int])], name: String): Unit = {
     val collected: Array[((Int, Int), Array[Int])] = pairRDD.collect()
     val sb: mutable.StringBuilder = mutable.StringBuilder.newBuilder
@@ -378,6 +358,10 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     println(sb.toString())
   }
 
+  /**
+   * Collects a PairRDD[(Int, Array[Int])] and prints it in a readable format.
+   * Don't use on massive RDDs.
+   */
   def collectAndPrintMapRDD(mapRDD: RDD[(Int, Array[Int])], name: String): Unit = {
     val collectedMap: Map[Int, Array[Int]] = mapRDD.collectAsMap()
     val sb: mutable.StringBuilder = mutable.StringBuilder.newBuilder
@@ -388,6 +372,9 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     println(sb.toString())
   }
 
+  /**
+   * Calculates and returns the adjacent neighbors for every node in the form (id, [neighbors]) as an RDD.
+   */
   def getAdjacencyListRDD(bidirectionalEdges: RDD[(Int, Int)]): RDD[(Int, Array[Int])] = {
     bidirectionalEdges.map(row => {  // Convert all the "to" values to a Scala List containing the "to" value
         (row._1, List(row._2))
@@ -399,22 +386,21 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
   }
 
   /**
-     Creates and returns a bidirectional edges list, i.e:
-     (1, 2),
-     (2, 1),
-     (1, 3),
-     (3, 1),
-     ...
-     (n, m),
-     (m, n)
-     where both the from and to ids have to be less-than or equal to the year given.
+   * Creates and returns a bidirectional edges list, i.e:
+   * (1, 2),
+   * (2, 1),
+   * (1, 3),
+   * (3, 1),
+   * ...
+   * (n, m),
+   * (m, n)
+   * ...where both the from and to ids have to be less-than or equal to the year given.
    */
   def getBidirectionalEdgesByYearRDD(citationsDF: DataFrame, publishedDatesDF: DataFrame, year: Int,
                                      sparkSession: SparkSession): RDD[(Int, Int)] = {
     import sparkSession.implicits._
 
-    citationsDF
-      .join(
+    citationsDF.join(
         publishedDatesDF,
         citationsDF("from") === publishedDatesDF("id")
       )
@@ -433,6 +419,46 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       }).rdd
   }
 
+  /**
+   * Uses the bidirectional edges RDD to calculate all unique paths of length d = 1.
+   */
+  def getPathsOfLengthOneRDD(bidirectionalEdgesRDD: RDD[(Int, Int)]): RDD[((Int, Int), Array[Int])] = {
+    bidirectionalEdgesRDD.map(row => {
+      val start: Int = row._1; val end: Int = row._2
+      val key: (Int, Int) = if (end < start) (end, start) else (start, end)
+      val path: Array[Int] = Array(start, end)
+      (key, path)
+    }).reduceByKey((a: Array[Int], _: Array[Int]) => a, numPartitions = 16)
+  }
+
+  /**
+   * Uses the adjacency list RDD to calculate all unique paths of length d = 2.
+   */
+  def getPathsOfLengthTwoRDD(adjacencyListRDD: RDD[(Int, Array[Int])]): RDD[((Int, Int), Array[Int])] = {
+    adjacencyListRDD.flatMap(row => {
+      val id: Int = row._1
+      val neighbors: Array[Int] = row._2
+      val edges: ListBuffer[((Int, Int), Array[Int])] = ListBuffer[((Int, Int), Array[Int])]()
+      if (neighbors.length > 1) {
+        for (i: Int <- 0 to (neighbors.length-2)) {
+          for (j: Int <- (i + 1).until(neighbors.length)) {
+            var start: Int = neighbors(i)
+            var end: Int = neighbors(j)
+
+            // Swap if end < start
+            if (end < start) { val temp = end; end = start; start = temp }
+            edges += (((start,end), Array(start,id,end)))
+          }
+        }
+      }
+      edges.toList
+    }).reduceByKey((a: Array[Int], _: Array[Int]) => a, numPartitions = 16)
+  }
+
+  /**
+   * Counts and records the total number of node-pair shortest paths found for a given maximum path
+   * length d. Also records the percentage of the total number of node-pairs that was achieved.
+   */
   def recordResultsForD(d: Int, totalPairs: Long, shortestPathsRDD: RDD[((Int, Int), Array[Int])],
                         results: ListBuffer[(Int, Long, Double)]): Long = {
     val pairCount: Long = shortestPathsRDD.count()
