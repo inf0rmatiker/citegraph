@@ -193,7 +193,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     var count: Long = 0
     var resultsPercent: Double = results.last._3
 
-    while (generatedNewPaths && (count < totalPairs) && (d <= 20) && (resultsPercent <= 90.0)) {
+    while (generatedNewPaths && (count < totalPairs) && (d <= 20) && (resultsPercent <= 0.90)) {
       d += 1
       val previousCount: Long = combinedShortestPathsRDDs.last.count()
 
