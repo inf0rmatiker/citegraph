@@ -83,25 +83,43 @@ object Application {
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
     //val densities: DataFrame = analytics.findDensitiesByYear()
     val nodePairs: Array[(Int, Long)] = loadTotalNodePairsFromCSV(sparkSession)
-    for (nodePairYear: (Int, Long) <- nodePairs) {
-      val year: Int = nodePairYear._1
-      val totalPairs: Long = nodePairYear._2
-      val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(
-        year,
-        totalPairs,
-        debug = isTestingEnv
-      )
+//    for (nodePairYear: (Int, Long) <- nodePairs) {
+//      val year: Int = nodePairYear._1
+//      val totalPairs: Long = nodePairYear._2
+//      val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(
+//        year,
+//        totalPairs,
+//        debug = isTestingEnv
+//      )
+//
+//      print("tableByYear:\n")
+//      tableByYear.foreach{println}
+//
+//      val resultsRDD = sparkSession.sparkContext.parallelize(tableByYear)
+//      val resultsDF = sparkSession.createDataFrame(resultsRDD).toDF("d", "g(d)", "percent_of_total")
+//
+//      // Save DataFrames as .csv files to HDFS output directory
+//      val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
+//      dataframeSaver.saveSortedAsCsv(filename = s"diameter_$year", resultsDF, sortByCol = "d")
+//    }
 
-      print("tableByYear:\n")
-      tableByYear.foreach{println}
+    val year: Int = nodePairs(5)._1
+    val totalPairs: Long = nodePairs(5)._2
+    val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(
+      year,
+      totalPairs,
+      debug = isTestingEnv
+    )
 
-      val resultsRDD = sparkSession.sparkContext.parallelize(tableByYear)
-      val resultsDF = sparkSession.createDataFrame(resultsRDD).toDF("d", "g(d)", "percent_of_total")
+    print("tableByYear:\n")
+    tableByYear.foreach{println}
 
-      // Save DataFrames as .csv files to HDFS output directory
-      val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
-      dataframeSaver.saveSortedAsCsv(filename = s"diameter_$year", resultsDF, sortByCol = "d")
-    }
+    val resultsRDD = sparkSession.sparkContext.parallelize(tableByYear)
+    val resultsDF = sparkSession.createDataFrame(resultsRDD).toDF("d", "g(d)", "percent_of_total")
+
+    // Save DataFrames as .csv files to HDFS output directory
+    val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
+    dataframeSaver.saveSortedAsCsv(filename = s"diameter_$year", resultsDF, sortByCol = "d")
 
     sparkSession.close()
   }
