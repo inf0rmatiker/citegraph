@@ -83,7 +83,7 @@ object Application {
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
     //val densities: DataFrame = analytics.findDensitiesByYear()
     val nodePairs: Array[(Int, Long)] = loadTotalNodePairsFromCSV(sparkSession)
-    for (i: Int <- 2 until nodePairs.length) {
+    for (i: Int <- 1 until nodePairs.length - 5) {
       val nodePairYear: (Int, Long) = nodePairs(i)
       val year: Int = nodePairYear._1
       val totalPairs: Long = nodePairYear._2
