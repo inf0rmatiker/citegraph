@@ -222,7 +222,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     while (pathsOfLengthDRDDs.nonEmpty) {
       pathsOfLengthDRDDs.last.unpersist()
-      pathsOfLengthDRDDs.remove(combinedShortestPathsRDDs.length-1)
+      pathsOfLengthDRDDs.remove(pathsOfLengthDRDDs.length-1)
     }
 
     results.toList
