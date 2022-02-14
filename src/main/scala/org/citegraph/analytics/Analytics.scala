@@ -366,50 +366,39 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     // Add on length 3
     val lengthThreeCount: Long = combinedShortestPaths.count()
     val lengthThreePercent: Double = (lengthThreeCount * 1.0) / (totalPairs * 1.0)
-    results += ((2, lengthThreeCount, lengthThreePercent))
+    results += ((3, lengthThreeCount, lengthThreePercent))
 
     if (debug) collectAndPrintPairRDD(combinedShortestPaths, "combinedShortestPaths")
 
-
-
-
-
-
-
-    /*var subtractedAndDistinct: RDD[(String, Array[Int])] = pathsOfLengthTwo
-      .subtractByKey(shortestPathsOfLengthOne)
-      .union(shortestPathsOfLengthOne)
-      .sortByKey(ascending = true)
-
-    if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
-
-
-
-    // Unpersist length 1/2 since they are no longer needed
-    pathsOfLengthTwo.unpersist()
-    shortestPathsOfLengthOne.unpersist()
-
-    // Length 3 and up
-    var pathLength: Int = 2
+    // Length 4 and up
+    var pathLength: Int = 3
     var generatedNewPaths: Boolean = true
     var count: Long = 0
 
     while (generatedNewPaths && (count < totalPairs)) {
       pathLength += 1
-      val previousCount: Long = subtractedAndDistinct.count()
+      val previousCount: Long = combinedShortestPaths.count()
 
-      subtractedAndDistinct = generateNextShortestPaths(pathLength, subtractedAndDistinct, adjacencyMap)
-        .subtractByKey(subtractedAndDistinct)
-        .union(subtractedAndDistinct)
-        .sortByKey(ascending = true)
+      val pathsOfLengthD: RDD[((Int, Int), Array[Int])] = generatePathsOfLengthD(combinedShortestPaths, adjacencyMap)
+      combinedShortestPaths = combineWithPathsOfLengthD(pathsOfLengthD, combinedShortestPaths)
 
-      count = subtractedAndDistinct.count()
+      count = combinedShortestPaths.count()
       val countPercentage: Double = (count * 1.0) / (totalPairs * 1.0)
       generatedNewPaths = if (previousCount == count) false else true
       results += ((pathLength, count, countPercentage))
     }
 
     println(s"Stopped at $pathLength path length")
+    /*
+
+    // Unpersist length 1/2 since they are no longer needed
+    pathsOfLengthTwo.unpersist()
+    shortestPathsOfLengthOne.unpersist()
+
+
+
+
+
     if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")*/
     results.toList
   }
