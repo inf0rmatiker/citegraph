@@ -150,6 +150,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     import sparkSession.implicits._
 
     println(s"totalPairs: $totalPairs")
+    val results: ListBuffer[(Int, Long, Double)] = ListBuffer[(Int, Long, Double)]()
 
     /*
     Create bi-directional edges for the citationsDF:
@@ -226,6 +227,11 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     }).reduceByKey((a: Array[Int], _: Array[Int]) => a)
       .sortByKey(ascending = true)
 
+    // Add on length 1
+    val lengthOneCount: Long = pathsOfLengthOne.count()
+    val lengthOnePercent: Double = (lengthOneCount * 1.0) / (totalPairs * 1.0)
+    results += ((1, lengthOneCount, lengthOnePercent))
+
     if (debug) collectAndPrintPairRDD(pathsOfLengthOne, "pathsOfLengthOne")
 
     val pathsOfLengthTwo: RDD[((Int, Int), Array[Int])] = adjacencyList.flatMap(row => {
@@ -253,6 +259,11 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
     var combinedShortestPaths = pathsOfLengthTwo.subtractByKey(pathsOfLengthOne)
       .union(pathsOfLengthOne)
       .sortByKey(ascending = true)
+
+    // Add on length 2
+    val lengthTwoCount: Long = combinedShortestPaths.count()
+    val lengthTwoPercent: Double = (lengthTwoCount * 1.0) / (totalPairs * 1.0)
+    results += ((2, lengthTwoCount, lengthTwoPercent))
 
     if (debug) collectAndPrintPairRDD(combinedShortestPaths, "combinedShortestPaths")
 
@@ -352,7 +363,18 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
       .union(combinedShortestPaths)
       .sortByKey(ascending = true)
 
+    // Add on length 3
+    val lengthThreeCount: Long = combinedShortestPaths.count()
+    val lengthThreePercent: Double = (lengthThreeCount * 1.0) / (totalPairs * 1.0)
+    results += ((2, lengthThreeCount, lengthThreePercent))
+
     if (debug) collectAndPrintPairRDD(combinedShortestPaths, "combinedShortestPaths")
+
+
+
+
+
+
 
     /*var subtractedAndDistinct: RDD[(String, Array[Int])] = pathsOfLengthTwo
       .subtractByKey(shortestPathsOfLengthOne)
@@ -361,17 +383,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")
 
-    val results: ListBuffer[(Int, Long, Double)] = ListBuffer[(Int, Long, Double)]()
 
-    // Add on length 1
-    val lengthOneCount: Long = shortestPathsOfLengthOne.count()
-    val lengthOnePercent: Double = (lengthOneCount * 1.0) / (totalPairs * 1.0)
-    results += ((1, lengthOneCount, lengthOnePercent))
-
-    // Add on length 2
-    val lengthTwoCount: Long = subtractedAndDistinct.count()
-    val lengthTwoPercent: Double = (lengthTwoCount * 1.0) / (totalPairs * 1.0)
-    results += ((2, lengthTwoCount, lengthTwoPercent))
 
     // Unpersist length 1/2 since they are no longer needed
     pathsOfLengthTwo.unpersist()
@@ -399,54 +411,62 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     println(s"Stopped at $pathLength path length")
     if (debug) collectAndPrintPairRDD(subtractedAndDistinct, "subtractedAndDistinct")*/
-    // results.toList
-    List()
+    results.toList
   }
 
-  // .filter(row => row._2.length == nextPathLength)
-  def generateNextShortestPaths(nextPathLength: Int, currentShortestPaths: RDD[(String, Array[Int])],
-                                adjacencyMap: Map[Int, Array[Int]]): RDD[(String, Array[Int])] = {
-    currentShortestPaths.flatMap{
-        case(endpoints: String, path: Array[Int]) =>
-          var edges: ListBuffer[String] = ListBuffer()
-          val firstElement: Int = path(0)
-          val lastElement: Int = path(path.length-1)
-          val firstElementNeighbors: Array[Int] = adjacencyMap(firstElement)
-          val lastElementNeighbors: Array[Int] = adjacencyMap(lastElement)
+  def generatePathsOfLengthD(pathsOfLengthDMinusOne: RDD[((Int, Int), Array[Int])],
+                                adjacencyMap: Map[Int, Array[Int]]): RDD[((Int, Int), Array[Int])] = {
+    pathsOfLengthDMinusOne.flatMap{
+      case((start: Int, end: Int), path: Array[Int]) =>
+        val newRows: ListBuffer[((Int, Int), Array[Int])] = new ListBuffer[((Int, Int), Array[Int])]()
+        val firstElementNeighbors: Array[Int] = adjacencyMap(start)
+        val lastElementNeighbors: Array[Int] = adjacencyMap(end)
 
-          // Iterate over neighbors of first element and see if there's any not already in the path
-          // If there are, prepend it to the path.
-          for (neighbor: Int <- firstElementNeighbors) {
-            if (!path.contains(neighbor)) {
-              var start: Int = neighbor
-              var end: Int = lastElement
+        // Iterate over neighbors of first element and see if there's any not already in the path
+        // If there are, prepend it to the path.
+        for (neighbor: Int <- firstElementNeighbors) {
+          if (!path.contains(neighbor)) {
+            val newStart: Int = neighbor
+            val newEnd: Int = end
 
-              // Swap if end < start
-              if (end < start) { val temp = end; end = start; start = temp }
-              edges += "%d~%d:%d,%s".format(start, end, neighbor, path.mkString(","))
-            }
+            // Swap if end < start
+            val newKey: (Int, Int) = if (newEnd < newStart) (newEnd, newStart) else (newStart, newEnd)
+
+            // New array: [ <start_neighbor>, <original_path> ]
+            val newPath: Array[Int] = new Array[Int](path.length + 1)
+            newPath(0) = newStart
+            for (i <- path.indices) newPath(i+1) = path(i)
+            newRows += ((newKey, newPath))
           }
+        }
 
-          // Iterate over neighbors of last element and see if there's any not already in the path.
-          // If there are, append it to the path.
-          for (neighbor: Int <- lastElementNeighbors) {
-            if (!path.contains(neighbor)) {
-              var start: Int = firstElement
-              var end: Int = neighbor
+        // Iterate over neighbors of last element and see if there's any not already in the path.
+        // If there are, append it to the path.
+        for (neighbor: Int <- lastElementNeighbors) {
+          if (!path.contains(neighbor)) {
+            val newStart: Int = start
+            val newEnd: Int = neighbor
 
-              // Swap if end < start
-              if (end < start) { val temp = end; end = start; start = temp }
-              edges += "%d~%d:%s,%d".format(start, end, path.mkString(","), neighbor)
-            }
+            // Swap if end < start
+            val newKey: (Int, Int) = if (newEnd < newStart) (newEnd, newStart) else (newStart, newEnd)
+
+            // New array: [ <original_path>, <end_neighbor> ]
+            val newPath: Array[Int] = new Array[Int](path.length + 1)
+            for (i <- path.indices) newPath(i) = path(i)
+            newPath(newPath.length-1) = newEnd
+            newRows += ((newKey, newPath))
           }
+        }
+        newRows.toList
+    }.reduceByKey((a: Array[Int], _: Array[Int]) => a)
+      .sortByKey(ascending = true)
+  }
 
-          edges.toList
-      }.map(encodedString => {
-        val parts: Array[String] = encodedString.split(":")
-        val endpoints: String = parts(0)
-        val path: Array[Int] = parts(1).split(",").map(_.toInt)
-        (endpoints, path)
-      }).reduceByKey((a: Array[Int], _: Array[Int]) => a)
+  def combineWithPathsOfLengthD(pathsOfLengthD: RDD[((Int, Int), Array[Int])],
+                                currentShortestPaths: RDD[((Int, Int), Array[Int])]): RDD[((Int, Int), Array[Int])] = {
+    pathsOfLengthD.subtractByKey(currentShortestPaths)
+      .union(currentShortestPaths)
+      .sortByKey(ascending = true)
   }
 
   def collectAndPrintPairRDD(pairRDD: RDD[((Int,Int), Array[Int])], name: String): Unit = {
