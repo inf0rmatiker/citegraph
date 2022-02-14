@@ -191,8 +191,9 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
     var generatedNewPaths: Boolean = true
     var count: Long = 0
+    var resultsPercent: Double = results.last._3
 
-    while (generatedNewPaths && (count < totalPairs) && (d <= 20)) {
+    while (generatedNewPaths && (count < totalPairs) && (d <= 20) && (resultsPercent <= 90.0)) {
       d += 1
       val previousCount: Long = combinedShortestPathsRDDs.last.count()
 
@@ -202,6 +203,7 @@ class Analytics(sparkSession: SparkSession, citationsDF: DataFrame, publishedDat
 
       // Determine pair count, whether we should continue, and record results
       count = recordResultsForD(d, totalPairs, combinedShortestPathsRDDs.last, results)
+      resultsPercent = results.last._3
       generatedNewPaths = if (previousCount == count) false else true
 
       // Unpersist obsolete RDDs and delete references
