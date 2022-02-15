@@ -63,7 +63,7 @@ object Application {
       } else if (!isValidHdfsUri(outputDirectory)) {
         printf("Invalid HDFS output directory: %s\n", outputDirectory)
         System.exit(1)
-      } else if ((taskToRun != "density") || (taskToRun != "diameter")) {
+      } else if ((!taskToRun.equals("density")) || (!taskToRun.equals("diameter"))) {
         printf("Invalid task definition: %s\n", taskToRun)
         System.exit(1)
       }
