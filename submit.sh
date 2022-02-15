@@ -16,9 +16,6 @@ if [[ $# -eq 3 ]]; then
     --class org.citegraph.Application \
     --master "$SPARK_MASTER_URI" \
     --deploy-mode cluster \
-    --driver-memory 4g \
-    --executor-memory 2g \
-    --executor-cores 1 \
     target/scala-2.12/citegraph_2.12-0.1.jar "$HDFS_INPUT_DIR" "$HDFS_OUTPUT_DIR"
 else
   print_usage

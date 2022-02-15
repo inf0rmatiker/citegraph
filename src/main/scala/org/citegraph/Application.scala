@@ -1,5 +1,6 @@
 package org.citegraph
 
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.citegraph.analytics.Analytics
 import org.citegraph.loading.DataFrameLoader
@@ -22,6 +23,14 @@ object Application {
     println()
   }
 
+  def loadTotalNodePairsFromCSV(sparkSession: SparkSession): Array[(Int, Long)] = {
+    val rddFromFile: RDD[String] = sparkSession.sparkContext.textFile("hdfs://ant:30201/cs535/data/nodepairs.csv")
+    rddFromFile.map(f=>{
+      val parts = f.split(",")
+      (parts(0).toInt, parts(1).toLong)
+    }).collect()
+  }
+
   def isValidHdfsUri(uri: String): Boolean = {
     uri.startsWith("hdfs://")
   }
@@ -31,12 +40,14 @@ object Application {
 
     var inputDirectory: String = ""
     var outputDirectory: String = ""
+    var isTestingEnv: Boolean = false
 
     // Parse input args
     if (args.length < 2 || args.length > 3) {
       printUsage()
       System.exit(1)
     } else if (args.length == 3 && args(0) == "--testing") {
+      isTestingEnv = true
       printf("Running in local testing mode")
       inputDirectory = args(1)
       outputDirectory = args(2)
@@ -71,10 +82,27 @@ object Application {
     // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
     //val densities: DataFrame = analytics.findDensitiesByYear()
-    analytics.findGraphDiameterByYear(edgeCount = 0, year = 1995)
-    // Save DataFrames as .csv files to HDFS output directory
-    //val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
-    //dataframeSaver.saveSortedAsCsv(filename = "densities.csv", densities, sortByCol = "year")
+    val nodePairs: Array[(Int, Long)] = loadTotalNodePairsFromCSV(sparkSession)
+    for (i: Int <- 2 until nodePairs.length) {
+      val nodePairYear: (Int, Long) = nodePairs(i)
+      val year: Int = nodePairYear._1
+      val totalPairs: Long = nodePairYear._2
+      val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(
+        year,
+        totalPairs,
+        debug = isTestingEnv
+      )
+
+      print("tableByYear:\n")
+      tableByYear.foreach{println}
+
+      val resultsRDD = sparkSession.sparkContext.parallelize(tableByYear)
+      val resultsDF = sparkSession.createDataFrame(resultsRDD).toDF("d", "g(d)", "percent_of_total")
+
+      // Save DataFrames as .csv files to HDFS output directory
+      val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
+      dataframeSaver.saveSortedAsCsv(filename = s"diameter_$year", resultsDF, sortByCol = "d")
+    }
 
     sparkSession.close()
   }
