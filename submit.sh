@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function print_usage {
-  echo -e "USAGE\n\tsubmit.sh <spark_master_uri> <input_data_directory> <output_directory>"
+  echo -e "USAGE\n\tsubmit.sh <spark_master_uri> <citegraph_task_to_run> <input_data_directory> <output_directory>"
   echo -e "\nEXAMPLE\n"
   echo -e "\tsubmit.sh spark://bismarck:9079 density hdfs://bismarck:30201/cs535/data hdfs://bismarck:30201/cs535/output\n"
 }
