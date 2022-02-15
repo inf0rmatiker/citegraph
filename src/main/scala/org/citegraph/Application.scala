@@ -40,24 +40,30 @@ object Application {
 
     var inputDirectory: String = ""
     var outputDirectory: String = ""
+    var taskToRun: String = ""
     var isTestingEnv: Boolean = false
 
     // Parse input args
-    if (args.length < 2 || args.length > 3) {
+    if (args.length < 2 || args.length > 4) {
       printUsage()
       System.exit(1)
-    } else if (args.length == 3 && args(0) == "--testing") {
+    } else if (args.length == 4 && args(0) == "--testing") {
       isTestingEnv = true
       printf("Running in local testing mode")
+      taskToRun = args(1)
+      inputDirectory = args(2)
+      outputDirectory = args(3)
+    } else if (args.length == 3) {
+      taskToRun = args(0)
       inputDirectory = args(1)
       outputDirectory = args(2)
-    } else if (args.length == 2) {
-      inputDirectory = args(0)
-      outputDirectory = args(1)
       if (!isValidHdfsUri(inputDirectory)) {
         printf("Invalid HDFS input directory: %s\n", inputDirectory)
         System.exit(1)
       } else if (!isValidHdfsUri(outputDirectory)) {
+        printf("Invalid HDFS output directory: %s\n", outputDirectory)
+        System.exit(1)
+      } else if ((taskToRun != "density") || (taskToRun != "diameter")) {
         printf("Invalid HDFS output directory: %s\n", outputDirectory)
         System.exit(1)
       }
@@ -81,27 +87,38 @@ object Application {
 
     // Launch graph analytics; capture DataFrames for results
     val analytics: Analytics = new Analytics(sparkSession, citationsDF, publishedDatesDF)
-    //val densities: DataFrame = analytics.findDensitiesByYear()
-    val nodePairs: Array[(Int, Long)] = loadTotalNodePairsFromCSV(sparkSession)
-    for (i: Int <- 1 until nodePairs.length - 5) {
-      val nodePairYear: (Int, Long) = nodePairs(i)
-      val year: Int = nodePairYear._1
-      val totalPairs: Long = nodePairYear._2
-      val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(
-        year,
-        totalPairs,
-        debug = isTestingEnv
-      )
 
-      print("tableByYear:\n")
-      tableByYear.foreach{println}
-
-      val resultsRDD = sparkSession.sparkContext.parallelize(tableByYear)
-      val resultsDF = sparkSession.createDataFrame(resultsRDD).toDF("d", "g(d)", "percent_of_total")
+    if (taskToRun == "density") {
+      val densities: DataFrame = analytics.findDensitiesByYear()
 
       // Save DataFrames as .csv files to HDFS output directory
       val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
-      dataframeSaver.saveSortedAsCsv(filename = s"diameter_$year", resultsDF, sortByCol = "d")
+      dataframeSaver.saveSortedAsCsv(filename = "densities", densities, sortByCol = "year")
+    }
+
+    if (taskToRun == "diameter") {
+      val nodePairs: Array[(Int, Long)] = loadTotalNodePairsFromCSV(sparkSession)
+      for (nodePairYear: (Int, Long) <- nodePairs) {
+        val year: Int = nodePairYear._1
+        val totalPairs: Long = nodePairYear._2
+        val tableByYear: List[(Int, Long, Double)] = analytics.findGraphDiameterByYear(
+          year,
+          totalPairs,
+          debug = isTestingEnv
+        )
+
+        print("tableByYear:\n")
+        tableByYear.foreach {
+          println
+        }
+
+        val resultsRDD = sparkSession.sparkContext.parallelize(tableByYear)
+        val resultsDF = sparkSession.createDataFrame(resultsRDD).toDF("d", "g(d)", "percent_of_total")
+
+        // Save DataFrames as .csv files to HDFS output directory
+        val dataframeSaver: DataFrameSaver = new DataFrameSaver(outputDirectory)
+        dataframeSaver.saveSortedAsCsv(filename = s"diameter_$year", resultsDF, sortByCol = "d")
+      }
     }
 
     sparkSession.close()
